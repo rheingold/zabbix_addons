@@ -76,7 +76,7 @@ Create configuration file:
 # Required: Path to plugin executable
 Plugins.Aggplugin.System.Path=C:\Zabbix\plugins\aggplugin-agent2.exe
 
-# Optional: Debug level (0-5, default: 0)
+# Optional: Debug level (0-5, default: 0) - see the config_template for details
 Plugins.Aggplugin.DebugLevel=3
 
 # Optional: Maximum samples before auto-reset (default: 1000)
@@ -102,15 +102,67 @@ Use `zabbix_get` to verify metrics are working:
 ```powershell
 # Test connectivity
 zabbix_get -s 127.0.0.1 -p 10050 -k "aggplugin.test"
-# Expected: "Aggplugin minimal test - plugin loaded successfully!"
+```
+**Expected output:**
+```
+Aggplugin minimal test - plugin loaded successfully!
+```
 
+```powershell
 # Get CPU statistics (wait a few seconds for samples)
 zabbix_get -s 127.0.0.1 -p 10050 -k "aggplugin.cpu_load"
-# Returns: {"metric":"cpu_load","values":{"all":{"avg":5.2,"min":2.1,"max":8.4,...}}}
+```
+**Example output:**
+```json
+{
+  "metric": "cpu_load",
+  "values": {
+    "all": {
+      "avg": 4.03452,
+      "min": 2.14258,
+      "max": 6.52344,
+      "med": 3.87109,
+      "mod": 3,
+      "dev": 1.28471,
+      "var": 1.65047,
+      "cnt": 15
+    }
+  }
+}
+```
 
+```powershell
 # Get memory statistics
 zabbix_get -s 127.0.0.1 -p 10050 -k "aggplugin.memory_usage"
-# Returns: {"metric":"mem_free","values":{"all":{"avg":16384.5,"min":16200,...}}}
+```
+**Example output:**
+```json
+{
+  "metric": "mem_free",
+  "values": {
+    "all": {
+      "avg": 51232.1,
+      "min": 51202.5,
+      "max": 51254.2,
+      "med": 51249.3,
+      "mod": 51254,
+      "dev": 21.6903,
+      "var": 470.47,
+      "cnt": 22
+    }
+  }
+}
+```
+
+**Statistics Explained:**
+- `avg` - Average value
+- `min` - Minimum value
+- `max` - Maximum value  
+- `med` - Median (50th percentile)
+- `mod` - Mode (most frequent value)
+- `dev` - Standard deviation
+- `var` - Variance
+- `cnt` - Sample count
 ```
 
 ### Using in Zabbix
