@@ -1,5 +1,5 @@
 # Build outputs
-# build/  # Temporarily disabled to commit build folder
+build/
 *.dll
 *.exe
 *.o
