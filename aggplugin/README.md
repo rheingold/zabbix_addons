@@ -30,6 +30,153 @@ Aggregated Metrics Plugin for Zabbix
 
 High-performance Windows metrics aggregation plugin for Zabbix Agent2. Continuously samples system metrics (CPU, memory) and computes comprehensive statistics including average, min/max, median, mode, standard deviation, and variance. Built with C++ for performance and Go for Agent2 integration.
 
+---
+
+## Quick Start for Zabbix Administrators
+
+### What This Plugin Does
+
+The Aggplugin continuously monitors your system metrics in the background and provides **statistical aggregation** instead of single-point measurements:
+
+- **CPU Load**: Average, minimum, maximum, median, mode, standard deviation over time
+- **Memory Usage**: Same comprehensive statistics for available memory
+- **JSON Output**: All statistics returned in a single metric query
+
+### Installation Steps
+
+#### 1. Download Pre-built Files
+
+Download the latest release from GitHub or build from source (see Build Instructions section).
+
+You need two files:
+- `aggplugin-agent2.exe` - The plugin executable
+- `libaggcollector.dll` - The C++ engine library
+
+#### 2. Deploy to Zabbix
+
+Copy both files to your Zabbix plugins directory:
+
+```powershell
+# Windows example
+Copy-Item aggplugin-agent2.exe C:\Zabbix\plugins\
+Copy-Item libaggcollector.dll C:\Zabbix\plugins\
+```
+
+**Common Zabbix plugin locations:**
+- `C:\Zabbix\plugins\` (custom installations)
+- `C:\Program Files\Zabbix Agent 2\plugins\`
+- `/usr/lib/zabbix/plugins/` (Linux - future support)
+
+#### 3. Configure Agent2
+
+Create configuration file:
+`C:\Zabbix\conf\zabbix_agent2.d\plugins.d\aggplugin.conf`
+
+```ini
+# Required: Path to plugin executable
+Plugins.Aggplugin.System.Path=C:\Zabbix\plugins\aggplugin-agent2.exe
+
+# Optional: Debug level (0-5, default: 0)
+Plugins.Aggplugin.DebugLevel=3
+
+# Optional: Maximum samples before auto-reset (default: 1000)
+Plugins.Aggplugin.MaxSamples=1000
+```
+
+**Adjust paths** to match your Zabbix installation!
+
+#### 4. Restart Zabbix Agent2
+
+```powershell
+# Windows
+Restart-Service "Zabbix Agent 2"
+
+# Linux (future)
+systemctl restart zabbix-agent2
+```
+
+#### 5. Test the Plugin
+
+Use `zabbix_get` to verify metrics are working:
+
+```powershell
+# Test connectivity
+zabbix_get -s 127.0.0.1 -p 10050 -k "aggplugin.test"
+# Expected: "Aggplugin minimal test - plugin loaded successfully!"
+
+# Get CPU statistics (wait a few seconds for samples)
+zabbix_get -s 127.0.0.1 -p 10050 -k "aggplugin.cpu_load"
+# Returns: {"metric":"cpu_load","values":{"all":{"avg":5.2,"min":2.1,"max":8.4,...}}}
+
+# Get memory statistics
+zabbix_get -s 127.0.0.1 -p 10050 -k "aggplugin.memory_usage"
+# Returns: {"metric":"mem_free","values":{"all":{"avg":16384.5,"min":16200,...}}}
+```
+
+### Using in Zabbix
+
+#### Available Metrics
+
+1. **`aggplugin.test`** - Connectivity test
+   - Returns: String "success message"
+   - Use for: Monitoring plugin availability
+
+2. **`aggplugin.cpu_load`** - CPU load aggregation
+   - Returns: JSON with statistics
+   - Statistics: `avg`, `min`, `max`, `med` (median), `mod` (mode), `dev` (std deviation), `var` (variance), `cnt` (sample count)
+
+3. **`aggplugin.memory_usage`** - Available memory aggregation
+   - Returns: JSON with same statistics
+   - Values in MB
+
+#### Adding to Zabbix Items
+
+**Item Configuration:**
+- **Type:** Zabbix agent (active/passive)
+- **Key:** `aggplugin.cpu_load` or `aggplugin.memory_usage`
+- **Type of information:** Text (raw JSON)
+- **Update interval:** 60s (or as needed)
+
+**Preprocessing Steps:**
+
+Extract specific statistics using JSON Path:
+
+```
+JSONPath: $.values.all.avg    → Get average
+JSONPath: $.values.all.max    → Get maximum
+JSONPath: $.values.all.min    → Get minimum
+JSONPath: $.values.all.med    → Get median
+```
+
+**Example Item:**
+```
+Name: CPU Load - Average
+Key: aggplugin.cpu_load
+Type: Zabbix agent
+Preprocessing:
+  1. JSONPath: $.values.all.avg
+  2. Custom multiplier: 1 (already in %)
+```
+
+### Troubleshooting
+
+#### Plugin Not Loading
+- Check Agent2 log: `C:\Zabbix\log\zabbix_agent2.log`
+- Verify plugin path in `aggplugin.conf`
+- Ensure both `.exe` and `.dll` are in the same directory
+
+#### No Metrics Returned
+- Check plugin debug log: `C:\Zabbix\log\aggplugin_debug.log`
+- Increase `DebugLevel` to 5 for verbose logging
+- First query may return null (needs baseline sample)
+
+#### Metrics Return Null
+- Wait 2-3 seconds after restart for baseline
+- CPU metric needs 2 samples minimum
+- Check sample count in JSON (`cnt` field)
+
+---
+
 ## Directory Structure
 
 ```
