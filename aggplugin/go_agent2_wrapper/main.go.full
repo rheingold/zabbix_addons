@@ -1,0 +1,146 @@
+/*
+ * Aggplugin Agent2 Wrapper (Go) - MINIMAL TEST VERSION
+ *
+ * This minimal version just logs initialization and provides a dummy metric.
+ * No CGO, no C++ calls - just testing if the plugin loads successfully.
+ */
+
+package main
+
+import (
+	"git.zabbix.com/ap/plugin-support/log"
+	"git.zabbix.com/ap/plugin-support/plugin"
+)
+
+// Plugin name and version
+const (
+	pluginName = "Aggplugin"
+	version    = "1.0.0-minimal"
+)
+
+// Aggplugin struct implements the plugin interfaces
+type Aggplugin struct {
+	plugin.Base
+}
+
+// Ensure our plugin implements the required interface
+var _ plugin.Exporter = (*Aggplugin)(nil)
+
+// Export implements the Exporter interface for metric collection
+func (p *Aggplugin) Export(key string, params []string, context plugin.ContextProvider) (interface{}, error) {
+	p.Debugf("Export called for key: %s", key)
+
+	switch key {
+	case "aggplugin.cpu_load":
+		return p.getAggregatedMetric("cpu_load")
+	case "aggplugin.memory_usage":
+		return p.getAggregatedMetric("mem_free")
+	default:
+		return nil, errors.New("unsupported item key")
+	}
+}
+
+// getAggregatedMetric fetches aggregated JSON data from our C++ collector
+func (p *Aggplugin) getAggregatedMetric(metricName string) (string, error) {
+	cMetricName := C.CString(metricName)
+	defer C.free(unsafe.Pointer(cMetricName))
+
+	// Buffer for JSON result
+	bufferSize := 1024
+	buffer := make([]byte, bufferSize)
+
+	// Call our C++ collector function
+	result := C.collector_fetch_and_reset_json(cMetricName, (*C.char)(unsafe.Pointer(&buffer[0])), C.uint(bufferSize))
+
+	if result != 0 {
+		return "", errors.New("failed to fetch metric data")
+	}
+
+	// Convert C string to Go string
+	jsonData := C.GoString((*C.char)(unsafe.Pointer(&buffer[0])))
+	return jsonData, nil
+}
+
+// Start implements the Runner interface - starts the background collector
+func (p *Aggplugin) Start() {
+	if p.running {
+		return
+	}
+
+	p.Infof("Starting Aggplugin background collector")
+
+	// Initialize the C++ collector with 1 second base interval
+	C.collector_init(1.0)
+
+	// Register metrics we want to collect
+	p.registerMetric("cpu_load", 1.0)
+	p.registerMetric("mem_free", 1.0)
+
+	p.running = true
+	p.Infof("Aggplugin background collector started successfully")
+}
+
+// Stop implements the Runner interface - stops the background collector
+func (p *Aggplugin) Stop() {
+	if !p.running {
+		return
+	}
+
+	p.Infof("Stopping Aggplugin background collector")
+
+	// Stop the C++ collector
+	C.collector_stop()
+
+	p.running = false
+	p.Infof("Aggplugin background collector stopped")
+}
+
+// registerMetric registers a metric with the C++ collector
+func (p *Aggplugin) registerMetric(name string, multiplicator float64) error {
+	cName := C.CString(name)
+	defer C.free(unsafe.Pointer(cName))
+
+	result := C.collector_register_metric(cName, C.double(multiplicator))
+	if result != 0 {
+		return fmt.Errorf("failed to register metric: %s", name)
+	}
+
+	p.Debugf("Registered metric: %s with multiplicator: %.2f", name, multiplicator)
+	return nil
+}
+
+func main() {
+	err := run()
+	if err != nil {
+		panic(err)
+	}
+}
+
+func run() error {
+	p := &Aggplugin{}
+
+	// Register metrics with the Zabbix Agent2 framework
+	plugin.RegisterMetrics(
+		p,
+		pluginName,
+		"aggplugin.cpu_load", "Returns aggregated CPU load statistics (JSON).",
+		"aggplugin.memory_usage", "Returns aggregated memory usage statistics (JSON).",
+	)
+
+	// Create handler
+	h, err := container.NewHandler(pluginName)
+	if err != nil {
+		return fmt.Errorf("failed to create handler: %w", err)
+	}
+
+	// Setup logging
+	p.Logger = &h
+
+	// Execute plugin (blocks until termination)
+	err = h.Execute()
+	if err != nil {
+		return fmt.Errorf("failed to execute plugin handler: %w", err)
+	}
+
+	return nil
+}

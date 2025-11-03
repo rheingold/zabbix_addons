@@ -1,0 +1,34 @@
+# Build outputs
+build/
+*.dll
+*.exe
+*.o
+*.obj
+
+# Go build artifacts
+go_agent2_wrapper/aggplugin
+go_agent2_wrapper/aggplugin.exe
+
+# Private configuration (local system paths)
+ai_priv/
+ai_priv.txt
+ai_hist.txt
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Log files
+*.log
+
+# Temporary files
+*.tmp
+*.temp

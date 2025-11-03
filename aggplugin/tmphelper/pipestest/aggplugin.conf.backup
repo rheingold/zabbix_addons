@@ -1,0 +1,16 @@
+# Aggplugin Configuration for Agent2
+# C++ aggregation plugin via Go wrapper - MINIMAL TEST VERSION
+# Provides: aggplugin.test
+
+# Option: Plugins.Aggplugin.System.Path
+# Path to the aggplugin Agent2 executable
+# Mandatory: yes for Agent2
+# DISABLED FOR DEBUGGING:
+# Plugins.Aggplugin.System.Path=C:\Zabbix\plugins\aggplugin-agent2.exe
+
+# Option: Plugins.Aggplugin.Timeout  
+# Timeout for metric collection (seconds)
+# Mandatory: no
+# Range: 1-30
+# Default: 3
+# Plugins.Aggplugin.Timeout=3
