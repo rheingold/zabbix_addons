@@ -1,0 +1,74 @@
+=== AI CONTEXT - MULTIGRAPH (GENERIC) ===
+Updated: Nov 5, 2025
+
+⚠️ SYNC ai.txt + ai_priv.txt | Update BOTH with: deployment/build/debug changes
+This=generic(Git). ai_priv=local paths/creds(git-ignored).
+
+⚠️ CRITICAL: NO DELETES WITHOUT APPROVAL ⚠️
+NEVER delete files/containers/images/code without listing & getting user confirmation first.
+Exception: Only ai_priv.txt/ai.txt context file recreation is auto-allowed.
+
+⚠️ CONTEXT MAINTENANCE DIRECTIVE ⚠️
+When a problem is SOLVED:
+1. REMOVE the problem description from ai.txt/ai_priv.txt
+2. ADD solution note to relevant file:
+   - Code fixes →Comment in source file where fix applied
+   - Build/deploy → Comment in Dockerfile or deployment script
+   - Environment/config → Note in README.md "Build Notes" section
+3. Keep context files focused on CURRENT state, not historical issues
+
+PROJECT: Zabbix Multigraph UI Plugin v0.1 (started Nov 5, 2025)
+Lead: lukas@plachy.eu | Dev: Claude Sonnet 4.5 (AI)
+PHP plugin for Zabbix Web UI - enhanced multi-graph visualization
+Tech: PHP, JS/jQuery, Zabbix API
+URL: https://zabbix.plachy.eu (reverse proxy → backend)
+
+FUNCTIONAL REQUIREMENTS:
+========================
+New "Graph" & "Graph prototype" components that:
+- Reference Items/Item prototypes by name via wildcard/regex (optional: derive regex parts from Zabbix macro lists)
+- Display multiple matching items in single graph
+- Visual compatibility with standard Zabbix graphs
+
+ARCHITECTURE:
+=============
+1. SELF-REGISTRATION: Plugin auto-registers, zero modifications to existing Zabbix files
+   - If patches unavoidable: use diff patch file + command (apply in Dockerfile)
+
+2. RENDERING MODES (config via hidden advanced UI section):
+   A) Server-side (PRIORITY): graphimagerenderer.php returns rendered image
+   B) Client-side (LATER): JS library + same PHP returns JSON data
+   
+3. CLIENT RENDERING (Mode B): Dynamic refresh on timeframe change without full redraw (fetch data only)
+
+STRUCTURE:
+src/Module.php, manifest.json (TODO) | actions/, views/, assets/ (TODO)
+docker/Dockerfile, deploy.sh (TODO)
+
+TWO-PHASE DEV:
+Phase A: Registration test (verify Zabbix picks up module in Admin→Modules)
+Phase B: Feature dev (actions, views, graph logic)
+
+WORKFLOW:
+1. Edit locally → 2. SSH/SCP to Docker host → 3. Deploy to container/rebuild
+4. Test: UI(manual), API(curl), logs(docker/console) → 5. Git commit/push
+
+PLUGIN REQS:
+Module.php implements Zabbix interfaces | manifest.json metadata
+Follow naming conventions | Handle sessions/permissions
+
+DEBUG:
+docker logs/exec | Browser F12 | Zabbix Admin→System Info
+
+SESSION NOTES (Nov 5):
+- Init project, folders empty, two-phase strategy defined
+- HTTP testing possible (server accessible), SSH config pending
+
+TODO:
+[ ] Configure Zabbix server access for HTTP testing
+[ ] Complete Docker host SSH configuration (ai_priv.txt)
+[ ] Create initial plugin structure (Module.php, manifest.json)
+[ ] Set up Docker deployment configuration
+[x] Create ai.txt
+
+=== END ===

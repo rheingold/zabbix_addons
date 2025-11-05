@@ -1,0 +1,22 @@
+{
+  "manifest_version": "2",
+  "type": "module",
+  "id": "multigraph",
+  "name": "Multigraph",
+  "author": "Lukas Plachy",
+  "description": "Enhanced multi-graph visualization with regex item matching",
+  "url": "https://github.com/rheingold/zabbix_addons",
+  "namespace": "Multigraph",
+  "version": "0.1.0",
+  "assets": {
+    "css": [],
+    "js": []
+  },
+  "actions": {
+    "multigraph.test": {
+      "class": "Test",
+      "layout": "layout.htmlpage",
+      "view": "multigraph.test"
+    }
+  }
+}
