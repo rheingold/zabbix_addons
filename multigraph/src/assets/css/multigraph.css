@@ -1,0 +1,129 @@
+/**
+ * ============================================================================
+ * File: multigraph.css
+ * Created: 2025-11-09 19:30:00
+ * 
+ * Lead & Architecture: lukas@plachy.eu
+ * Development: Claude Sonnet 4 (AI Assistant, Anthropic)
+ * 
+ * License: MIT (unless specified otherwise in project root)
+ * ============================================================================
+ * 
+ * PURPOSE:
+ * Stylesheet for multigraph widget appearance and layout.
+ * Integrates with Zabbix dashboard theme using CSS custom properties.
+ * Provides layered canvas structure for graph rendering and hover effects.
+ * 
+ * RELATIONS:
+ * - Used by: views/widget.view.php (widget display)
+ * - Styled elements: .multigraph-widget, .multigraph-container, canvas, tooltip
+ * - Theme integration: Uses var(--*) CSS custom properties from Zabbix
+ * 
+ * DESIGN STRATEGY:
+ * - CSS Custom Properties: Theme colors via var(--widget-border-color, etc.)
+ * - Layered Canvas: Base canvas (z-index: 1) + overlay canvas (z-index: 2)
+ * - Pointer Events: Overlay captures mouse, base canvas ignores mouse
+ * - Responsive: 100% width/height within widget container
+ * - Tooltip: Absolute positioned, high z-index, pointer-events: none
+ * 
+ * COLOR PALETTE:
+ * - Widget border: var(--widget-border-color) fallback #d4d4d4
+ * - Font color: var(--font-color) fallback inherit
+ * - Alt font: var(--font-alt-color) fallback #768d99
+ * - Link color: var(--link-color) fallback #0275b8
+ */
+
+/* === WIDGET CONTAINER === */
+/* Main widget wrapper with padding for dashboard integration */
+.multigraph-widget {
+    padding: 10px;     /* Breathing room within widget cell */
+    height: 100%;      /* Fill widget cell height */
+}
+
+/* === HEADER SECTION === */
+/* Widget title with bottom border separator */
+.multigraph-widget-header {
+    border-bottom: 1px solid var(--widget-border-color, #d4d4d4); /* Theme-aware border */
+    margin-bottom: 10px;
+    padding-bottom: 5px;
+}
+
+.multigraph-widget-header h4 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--font-color, inherit); /* Inherit from dashboard theme */
+}
+
+/* === BODY SECTION === */
+/* Widget content area for error/info messages */
+.multigraph-widget-body {
+    font-size: 13px;
+    color: var(--font-color, inherit); /* Inherit from dashboard theme */
+}
+
+.multigraph-widget-body p {
+    margin: 5px 0;
+}
+
+/* === METADATA DISPLAY === */
+/* Timestamp text styling (used in info messages) */
+.multigraph-timestamp {
+    color: var(--font-alt-color, #768d99); /* Muted text color */
+    font-size: 11px;
+    margin-top: 10px;
+}
+
+/* Info message styling */
+.multigraph-info {
+    color: var(--link-color, #0275b8); /* Link-style blue */
+    font-style: italic;
+    margin-top: 5px;
+}
+
+/* === CANVAS CONTAINER === */
+/* Container for layered canvas elements (base + overlay) */
+.multigraph-container {
+    position: relative; /* Establishes positioning context for absolute canvases */
+    width: 100%;        /* Fill widget width */
+    height: 100%;       /* Fill widget height */
+}
+
+/* Base styling for both canvas layers */
+.multigraph-container canvas {
+    position: absolute; /* Stack canvases in same space */
+    top: 0;
+    left: 0;
+    width: 100%;        /* Responsive to container */
+    height: 100%;       /* Responsive to container */
+}
+
+/* === OVERLAY CANVAS LAYER === */
+/* Top layer for hover effects and tooltips */
+/* CRITICAL: Must capture pointer events for hover to work */
+.multigraph-container canvas[id$='_overlay'] {
+    z-index: 2;                      /* Above base canvas */
+    pointer-events: auto !important; /* MUST capture mouse events */
+}
+
+/* === BASE CANVAS LAYER === */
+/* Bottom layer for graph rendering (lines, fills, axes) */
+.multigraph-container canvas[id$='_canvas'] {
+    z-index: 1;                /* Below overlay */
+    pointer-events: none;      /* Ignore mouse, pass to overlay */
+}
+
+/* === HOVER TOOLTIP === */
+/* Floating tooltip displayed on graph hover */
+.multigraph-tooltip {
+    position: absolute;             /* Positioned relative to container */
+    background: rgba(0, 0, 0, 0.8); /* Semi-transparent dark background */
+    color: #fff;                    /* White text for contrast */
+    padding: 8px;
+    border-radius: 4px;             /* Rounded corners */
+    font-size: 12px;
+    pointer-events: none;           /* Pass through mouse events */
+    display: none;                  /* Hidden by default, shown via JS */
+    z-index: 1000;                  /* Above everything */
+    white-space: nowrap;            /* Prevent text wrapping */
+}

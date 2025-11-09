@@ -1,0 +1,8 @@
+# AI private context and credentials
+ai_priv/
+
+# Deprecated code (old implementations, test scripts)
+deprecated/
+
+# Session notes
+SESSION_*.md

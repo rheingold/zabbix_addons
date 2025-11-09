@@ -1,53 +1,139 @@
-# Multigraph - Zabbix UI Plugin
-
-**Version:** 0.1 (development) | **Date:** November 5, 2025
-
----
-
-## Credits
+# Multigraph - Zabbix Widget
 
 ```
-╔════════════════════════════════════════════════════════════════════╗
-║  Lead & Architecture:  lukas@plachy.eu                             ║
-║  Development:          Claude Sonnet 4.5 (AI Assistant, Anthropic) ║
-║  Date:                 November 5, 2025                            ║
-║  Version:              0.1 (development)                           ║
-╚════════════════════════════════════════════════════════════════════╝
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                                                                           ║
+║                       MULTIGRAPH WIDGET                                    ║
+║                  Enhanced Zabbix Graph Visualization                      ║
+║                                                                           ║
+║  Version:          0.1.0 (Development)                                    ║
+║  Created:          November 5, 2025                                       ║
+║  Last Updated:     November 9, 2025                                       ║
+║                                                                           ║
+║  Lead & Architecture:  lukas@plachy.eu                                    ║
+║  Development:          Claude Sonnet 4 (AI Assistant, Anthropic)          ║
+║                                                                           ║
+║  License:          MIT License (see LICENSE file)                         ║
+║  Repository:       https://github.com/rheingold/zabbix_addons            ║
+║                                                                           ║
+╚═══════════════════════════════════════════════════════════════════════════╝
 ```
 
-*This project was developed through AI-assisted collaborative engineering.*
+**AI-Human Collaborative Development**  
+*This project represents collaborative engineering between human architecture/design and AI-assisted implementation.*
 
 ---
 
 ## Overview
 
-Zabbix UI plugin for enhanced graph visualization and multi-metric display capabilities.
+**Multigraph** is a custom Zabbix widget that provides enhanced graph visualization with advanced item pattern matching capabilities. Unlike standard Zabbix graphs that require manual item selection, Multigraph allows you to use wildcard and regex patterns to dynamically match items by name.
+
+### Key Features
+
+- ✨ **Pattern-Based Item Selection**: Use wildcards (`*`, `?`) or regex to match items
+- 📊 **Multi-Item Graphs**: Display multiple metrics in a single graph
+- 🎨 **Customizable Appearance**: Control colors, legend, fills, grid, and text styling
+- ⚡ **Client-Side Rendering**: Fast HTML5 Canvas-based rendering
+- 🔄 **Dashboard Integration**: Full integration with Zabbix dashboard timeframe selector
+- 🎯 **Interactive**: Hover to see precise values
+- 📱 **Responsive**: Adapts to widget resize
+
+---
 
 ## Directory Structure
 
 ```
 multigraph/
-├── src/                    # PHP source files
-│   ├── Module.php         # Main module entry point
-│   ├── actions/           # Action handlers
-│   ├── views/             # View templates
-│   └── assets/            # CSS, JavaScript
+├── README.md                      # This file - project overview
+├── .gitignore                     # Git exclusions
+├── ai.txt                         # AI context (generic)
+├── ai_priv/                       # Private context (git-ignored)
+│   ├── ai_priv.txt               # Local paths, credentials
+│   └── id_aibot                  # SSH key
 │
-├── manifest.json          # Zabbix plugin manifest
-├── docker/                # Docker build files
-│   ├── Dockerfile         # Custom Zabbix web image
-│   └── deploy.sh          # Deployment script
+├── docker/                        # Deployment helpers
+│   └── modules_rescan.php        # HTTP-accessible rescan helper
 │
-└── README.md              # This file
+├── zabbix-helpers.ps1            # PowerShell deployment functions
+│
+├── deprecated/                    # Git-ignored old code
+│   ├── tmptest/                  # API rescan experiments
+│   └── oldmodule/                # Old module-based approach
+│
+└── src/                           # Widget source (Zabbix-compatible structure)
+    ├── manifest.json              # Widget manifest
+    ├── Widget.php                 # Entry point
+    ├── README.md                  # Source structure documentation
+    │
+    ├── actions/                   # MVC Controllers
+    │   ├── README.md
+    │   ├── WidgetView.php         # Display controller
+    │   └── WidgetEdit.php         # Configuration controller
+    │
+    ├── includes/                  # MVC Models + Forms
+    │   ├── README.md
+    │   ├── GraphData.php          # Graph data preparation
+    │   ├── MatchedItemsData.php   # Item pattern matching
+    │   └── WidgetForm.php         # Configuration form
+    │
+    ├── views/                     # MVC Views (Templates)
+    │   ├── README.md
+    │   ├── widget.view.php        # Display template
+    │   ├── widget.edit.php        # Configuration template
+    │   └── widget.edit.js.php     # Configuration JavaScript
+    │
+    └── assets/                    # Frontend resources
+        ├── js/
+        │   ├── README.md
+        │   ├── class.widget.js    # Main widget JS
+        │   └── widget.edit.js     # Configuration JS
+        └── css/
+            ├── README.md
+            └── multigraph.css     # Widget styles
 ```
+
+---
 
 ## Development Setup
 
 ### Prerequisites
 
-- Zabbix server with web interface
-- SSH access to Docker host
-- PHP 7.4+ knowledge
+- Zabbix 7.4.3+ with web interface
+- PHP 8.4+ (Zabbix requirement)
+- SSH access to Zabbix server
+- Docker (if using containerized Zabbix)
+
+### Deployment
+
+**Manual Installation:**
+1. Copy `src/` contents to `/usr/share/zabbix/widgets/multigraph/`
+2. Rename `manifest-widget.json` to `manifest.json` (or use `manifest.json` directly)
+3. Set permissions: `chmod -R 755 /usr/share/zabbix/widgets/multigraph`
+4. In Zabbix UI: Administration → Modules → Scan directory
+5. Enable the widget
+
+**Docker Installation:**
+See `ai_priv/ai_priv.txt` for automated deployment scripts.
+
+---
+
+## Documentation
+
+- **`src/README.md`** - Source code structure and architecture
+- **`src/*/README.md`** - Directory-specific documentation
+- **Inline code comments** - Comprehensive PHPDoc and JSDoc
+
+---
+
+## Status
+
+**Current Phase:** B2.1 - Widget Development (Completed)  
+**Functional:** ✅ Widget rendering, item matching, configuration, dashboard integration  
+**Known Issues:** Timeframe parsing edge cases with relative dates
+
+---
+
+**For detailed development notes, see `ai.txt` and `ai_priv/ai_priv.txt`**
 
 ### Deployment
 
