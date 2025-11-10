@@ -88,17 +88,17 @@ $body = (new CDiv([
 		// Main canvas: Graph rendering layer
 		(new CTag('canvas'))
 			->setId($graph_id . '_canvas')
-			->addStyle('position: absolute; top: 0; left: 0; width: 100%; height: 100%;'),
+			->addStyle('position: absolute; top: 0; left: 0; z-index: 1;'),
 		// Overlay canvas: Interactive hover effects layer
 		(new CTag('canvas'))
 			->setId($graph_id . '_overlay')
-			->addStyle('position: absolute; top: 0; left: 0; width: 100%; height: 100%;')
+			->addStyle('position: absolute; top: 0; left: 0; z-index: 100;')
 	]))
 		->setId($graph_id)
 		->addClass('multigraph-container')
-		->addStyle('position: relative; width: 100%; height: 100%;')
+		->addStyle('position: relative; width: 100%; height: 100%; overflow: hidden;')
 ]))->addClass('multigraph-widget')
-	->addStyle('height: 100%;');
+	->addStyle('height: 100%; overflow: hidden;');
 
 (new CWidgetView($data))
 	->addItem($body)

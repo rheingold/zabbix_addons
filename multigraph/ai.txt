@@ -1,9 +1,14 @@
 === AI CONTEXT - MULTIGRAPH WIDGET (GENERIC) ===
 Updated: November 10, 2025
-Version: 0.1.0
+Version: 0.1.1
 
 ⚠️ SYNC ai.txt + ai_priv.txt | Update BOTH with: deployment/build/debug changes
 This file = generic context (Git-tracked). ai_priv.txt = local paths/credentials (git-ignored).
+
+⚠️⚠️⚠️ DEPLOYMENT COMMANDS: CHECK ai_priv.txt FIRST! ⚠️⚠️⚠️
+README.md and USAGE.md contain GENERIC examples for documentation purposes.
+ACTUAL deployment commands for THIS environment are in ai_priv.txt (git-ignored).
+ai_priv.txt contains: container names, TrueNAS app management, verified procedures.
 
 ⚠️ CRITICAL: NO DELETES WITHOUT APPROVAL ⚠️
 NEVER delete files/containers/images/code without listing & getting user confirmation first.
@@ -23,7 +28,7 @@ PROJECT OVERVIEW
 ================================================================================
 
 PROJECT: Multigraph Widget for Zabbix 7.4.3+
-VERSION: 0.1.0 (Development - Untested for Classic UI)
+VERSION: 0.1.1 (Development - Untested for Classic UI)
 STARTED: November 5, 2025
 LAST UPDATED: November 10, 2025
 

@@ -295,12 +295,20 @@ class CWidgetMultigraph extends CWidget {
 
         const graph_id = container.id;
         const canvas = document.getElementById(graph_id + '_canvas');
-        const overlay = document.getElementById(graph_id + '_overlay');
+        let overlay = document.getElementById(graph_id + '_overlay');
 
-        if (!canvas || !overlay) {
-            console.error('Canvas elements not found');
+        if (!canvas) {
+            console.error('Canvas element not found');
             return;
         }
+
+        // RECREATE overlay canvas from scratch to fix rendering bug
+        if (overlay) {
+            overlay.remove();
+        }
+        overlay = document.createElement('canvas');
+        overlay.id = graph_id + '_overlay';
+        container.appendChild(overlay);
 
         if (!this._graph_data || !this._graph_data.series) {
             console.error('No graph data available');
@@ -310,16 +318,48 @@ class CWidgetMultigraph extends CWidget {
         this._canvas = canvas;
         this._overlay = overlay;
 
-        const ctx = canvas.getContext('2d'); // Main canvas rendering context
         const data = this._graph_data;       // Alias for readability
 
         // === PHASE 2: Layout Calculation ===
         // Set canvas size to match container
         const rect = container.getBoundingClientRect();
-        canvas.width = rect.width;
-        canvas.height = rect.height;
-        overlay.width = rect.width;
-        overlay.height = rect.height;
+        const dpr = window.devicePixelRatio || 1;
+        
+        // Set canvas dimensions (both internal and CSS)
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        canvas.style.cssText = `position: absolute; top: 0; left: 0; width: ${rect.width}px; height: ${rect.height}px; z-index: 1;`;
+        
+        const ctx = canvas.getContext('2d');
+        ctx.scale(dpr, dpr);
+        
+        // Set overlay dimensions (both internal and CSS)
+        // CRITICAL: Canvas MUST have explicit pixel dimensions AND matching canvas.width/height
+        overlay.width = rect.width * dpr;
+        overlay.height = rect.height * dpr;
+        // Clear any existing styles first
+        overlay.style.cssText = '';
+        // Set styles individually with specific values
+        overlay.style.position = 'absolute';
+        overlay.style.top = '0';
+        overlay.style.left = '0';
+        overlay.style.width = rect.width + 'px';
+        overlay.style.height = rect.height + 'px';
+        overlay.style.pointerEvents = 'none';
+        overlay.style.zIndex = '100';
+        overlay.style.display = 'block';
+        overlay.style.visibility = 'visible';
+        overlay.style.opacity = '1';
+        // Force hardware acceleration
+        overlay.style.transform = 'translate3d(0,0,0)';
+        overlay.style.willChange = 'transform';
+        
+        const overlayCtx = overlay.getContext('2d', { alpha: true });
+        // USE SAME APPROACH AS MAIN CANVAS - scale and draw in CSS coordinates
+        overlayCtx.scale(dpr, dpr);
+        
+        // Force browser reflow to ensure dimensions are applied
+        void overlay.offsetHeight;
 
         const width = canvas.width;
         const height = canvas.height;
@@ -663,16 +703,7 @@ class CWidgetMultigraph extends CWidget {
             container.appendChild(tooltipDiv);
         }
 
-        // Configure overlay canvas to match main canvas dimensions
-        overlay.width = canvas.width;
-        overlay.height = canvas.height;
-        overlay.style.position = 'absolute';
-        overlay.style.top = '0';
-        overlay.style.left = '0';
-        overlay.style.pointerEvents = 'auto'; // CRITICAL: Enable mouse events on overlay
-        const overlayCtx = overlay.getContext('2d');
-
-        console.log('Multigraph: Setting up hover on overlay', overlay.id, 'size:', overlay.width, 'x', overlay.height);
+        // Overlay context was already created above in PHASE 2
 
         // Store layout bounds in closures for event handlers
         const graphBounds = { marginLeft, marginTop, graphWidth, graphHeight };
@@ -681,17 +712,15 @@ class CWidgetMultigraph extends CWidget {
 
         // Remove old event listeners (prevents memory leaks on re-render)
         if (this._mousemoveHandler) {
-            overlay.removeEventListener('mousemove', this._mousemoveHandler);
-            overlay.removeEventListener('mouseleave', this._mouseleaveHandler);
+            container.removeEventListener('mousemove', this._mousemoveHandler);
+            container.removeEventListener('mouseleave', this._mouseleaveHandler);
         }
 
         // === Mouse Move Handler: Show Values on Hover ===
         this._mousemoveHandler = (e) => {
-            const rect = overlay.getBoundingClientRect();
+            const rect = container.getBoundingClientRect();
             const mouseX = e.clientX - rect.left; // Mouse X in canvas coordinates
             const mouseY = e.clientY - rect.top;  // Mouse Y in canvas coordinates
-
-            console.log('Multigraph: Mouse move at', mouseX, mouseY);
 
             // Clear previous hover highlights
             overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
@@ -729,13 +758,16 @@ class CWidgetMultigraph extends CWidget {
                 const value = closestPoint[1];
 
                 // Draw highlight circle on overlay canvas at data point
+                // Drawing in CSS coordinates (overlayCtx has scale transform applied)
                 const pointX = graphBounds.marginLeft + ((timestamp - timeBounds.minTime) / timeBounds.timeRange) * graphBounds.graphWidth;
                 const pointY = graphBounds.marginTop + graphBounds.graphHeight - ((value - valueBounds.minValue) / valueBounds.valueRange) * graphBounds.graphHeight;
 
-                overlayCtx.fillStyle = series.color;
+                // Draw hollow circle in series color (no fill, slightly smaller, thinner)
+                overlayCtx.strokeStyle = series.color;
+                overlayCtx.lineWidth = 1.5;
                 overlayCtx.beginPath();
-                overlayCtx.arc(pointX, pointY, 5, 0, Math.PI * 2); // 5px radius circle
-                overlayCtx.fill();
+                overlayCtx.arc(pointX, pointY, 4, 0, Math.PI * 2); // 4px radius (was 6)
+                overlayCtx.stroke();
 
                 // Build tooltip HTML with colored bullet, series name, value, and time
                 const time = new Date(timestamp).toLocaleTimeString();
@@ -770,13 +802,9 @@ class CWidgetMultigraph extends CWidget {
             tooltipDiv.style.display = 'none';
         };
 
-        // Attach event listeners to overlay canvas
-        overlay.addEventListener('mousemove', this._mousemoveHandler);
-        overlay.addEventListener('mouseleave', this._mouseleaveHandler);
-
-        console.log('Multigraph: Event listeners attached to overlay', overlay.id);
-        console.log('Multigraph: Overlay style:', overlay.style.cssText);
-        console.log('Multigraph rendered successfully');
+        // Attach event listeners to container div (not overlay canvas)
+        container.addEventListener('mousemove', this._mousemoveHandler);
+        container.addEventListener('mouseleave', this._mouseleaveHandler);
     }
 
     /**
