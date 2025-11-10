@@ -1,8 +1,9 @@
-=== AI CONTEXT - MULTIGRAPH (GENERIC) ===
-Updated: Nov 9, 2025
+=== AI CONTEXT - MULTIGRAPH WIDGET (GENERIC) ===
+Updated: November 10, 2025
+Version: 0.1.0
 
 ⚠️ SYNC ai.txt + ai_priv.txt | Update BOTH with: deployment/build/debug changes
-This=generic(Git). ai_priv=local paths/creds(git-ignored).
+This file = generic context (Git-tracked). ai_priv.txt = local paths/credentials (git-ignored).
 
 ⚠️ CRITICAL: NO DELETES WITHOUT APPROVAL ⚠️
 NEVER delete files/containers/images/code without listing & getting user confirmation first.
@@ -12,197 +13,527 @@ Exception: Only ai_priv.txt/ai.txt context file recreation is auto-allowed.
 When a problem is SOLVED:
 1. REMOVE the problem description from ai.txt/ai_priv.txt
 2. ADD solution note to relevant file:
-   - Code fixes →Comment in source file where fix applied
+   - Code fixes → PHPDoc/JSDoc comment in source file where fix applied
    - Build/deploy → Comment in Dockerfile or deployment script
-   - Environment/config → Note in README.md "Build Notes" section
+   - Architecture/design → Note in README.md relevant section
 3. Keep context files focused on CURRENT state, not historical issues
 
-PROJECT: Zabbix Multigraph UI Plugin v0.1 (started Nov 5, 2025)
-Lead: lukas@plachy.eu | Dev: Claude Sonnet 4.5 (AI)
-PHP plugin for Zabbix Web UI - enhanced multi-graph visualization
-Tech: PHP, JS/jQuery, Zabbix API
-URL: https://zabbix.plachy.eu (reverse proxy → backend)
+================================================================================
+PROJECT OVERVIEW
+================================================================================
 
-FUNCTIONAL REQUIREMENTS:
-========================
-New "Graph" & "Graph prototype" components that:
-- Reference Items/Item prototypes by name via wildcard/regex (optional: derive regex parts from Zabbix macro lists)
-- Display multiple matching items in single graph
-- Visual compatibility with standard Zabbix graphs
+PROJECT: Multigraph Widget for Zabbix 7.4.3+
+VERSION: 0.1.0 (Development - Untested for Classic UI)
+STARTED: November 5, 2025
+LAST UPDATED: November 10, 2025
 
-ARCHITECTURE:
-=============
-1. SELF-REGISTRATION: Plugin auto-registers, zero modifications to existing Zabbix files
-   - If patches unavoidable: use diff patch file + command (apply in Dockerfile)
+TEAM:
+  Lead & Architecture: lukas@plachy.eu
+  Development: Claude Sonnet 4 (AI Assistant, Anthropic)
 
-2. RENDERING MODES (config via hidden advanced UI section):
-   A) Server-side (PRIORITY): graphimagerenderer.php returns rendered image
-   B) Client-side (LATER): JS library + same PHP returns JSON data
-   
-3. CLIENT RENDERING (Mode B): Dynamic refresh on timeframe change without full redraw (fetch data only)
+DESCRIPTION:
+  Custom Zabbix dashboard widget for pattern-based multi-item graph visualization.
+  Instead of manual item selection, uses wildcard/regex patterns to dynamically
+  match items by name, enabling flexible multi-metric graphs.
 
-⚠️⚠️⚠️ CRITICAL: WIDGET DEVELOPMENT WORKFLOW ⚠️⚠️⚠️
-=======================================================
-When adding/modifying widget configuration fields and rendering:
+REPOSITORY: https://github.com/rheingold/zabbix_addons
+BRANCH: tmp0.1 (development)
+LICENSE: MIT
 
-1. CONFIGURATION FIELDS (WidgetForm.php):
-   - Define fields in WidgetForm.php->addFields()
-   - Use integer constants for RadioButtonList (NOT strings!)
-     Example: COLOR_MODE_CYCLE = 0, COLOR_MODE_RANDOM = 1
-   - Set default values via ->setDefault()
-   - Zabbix 7.4.3: NO setHelpHint() method exists!
+TECHNOLOGY STACK:
+  Backend: PHP 8.4+ (Zabbix 7.x requirement)
+  Frontend: JavaScript ES6+, HTML5 Canvas
+  Framework: Zabbix Widget Framework (MVC)
+  API: Zabbix API (Item, History)
+  Deployment: Docker (optional), SSH, PowerShell scripts
 
-2. DATA FLOW (GraphRenderer.php):
-   - prepareGraphData() returns array structure
-   - MUST match JavaScript expectations exactly!
-   - Current structure: 
-     {
-       'series': [ {name, data: [[timestamp_ms, value], ...], color, units} ],
-       'legend_position': int (0/1/2),
-       'fill_opacity': float (0-1),
-       'y_axis_label': string,
-       'y_min': string ('auto' or number),
-       'y_max': string ('auto' or number),
-       'show_grid': bool,
-       'grid_density': string ('auto' or number)
-     }
+================================================================================
+MAIN OBJECTIVES (D.2.1)
+================================================================================
 
-3. VIEW TEMPLATE (widget.view.php):
-   - Use CWidgetView + setVar() to pass data to JS
-   - Create container with proper structure:
-     <div class="multigraph-container">
-       <canvas id="xxx_canvas"> (main graph)
-       <canvas id="xxx_overlay"> (hover effects)
-     </div>
-   - Call: (new CWidgetView($data))->addItem($body)->setVar('graph_data', $data['graph_data'])->show()
-   - DO NOT use inline JavaScript with CScriptTag!
+1. PATTERN-BASED ITEM SELECTION
+   Enable users to match items using wildcards (*, ?) or regular expressions
+   instead of manual selection, allowing dynamic graphs that auto-include new items.
 
-4. JAVASCRIPT (assets/js/class.widget.js):
-   - Extend CWidget class
-   - Implement setContents(response) to receive data
-   - Access data via response.graph_data (matches setVar key)
-   - DO NOT render in onActivate() - data not ready yet!
-   - Use this._target.querySelector() to find container
-   - Data structure MUST match PHP output exactly
-   - Draw order: grid → fills → lines → legend (so layers stack correctly)
-   - For hover: Clone overlay to remove old event listeners
-   - Text colors: Use '#000' for visibility (black text on light backgrounds)
+2. MULTI-ITEM VISUALIZATION
+   Display multiple matched items in single graph with customizable colors,
+   legend, and styling.
 
-5. DEPLOYMENT:
-   - Deploy ALL files: views/, assets/js/, includes/
-   - Rebuild Docker image after copying files
-   - Restart container to load new code
-   - Clear browser cache or add ?cachebuster to test
+3. DASHBOARD INTEGRATION
+   Full integration with Zabbix dashboard timeframe selector, supporting
+   absolute, relative, and period-rounding timeframes.
 
-6. DEBUGGING:
-   - Check browser console for JS errors
-   - Verify container exists: querySelector('.multigraph-container')
-   - Verify data structure: console.log(response.graph_data)
-   - Check canvas size: canvas.width/height should be > 0
-   - Grid not visible? Check fill opacity and draw order
+4. CLIENT-SIDE RENDERING
+   Fast HTML5 Canvas-based rendering with hover tooltips and responsive resize.
 
-COMMON PITFALLS:
-- Using strings instead of integers for RadioButtonList
-- Mismatched data structure between PHP and JS
-- Rendering before data arrives (onActivate too early)
-- Wrong querySelector (looking for wrong class/id)
-- Fill opacity covering everything (draw fills before lines)
-- Event listeners not cleaning up (clone element to reset)
-=======================================================
+5. ZERO ZABBIX MODIFICATIONS
+   Self-contained widget requiring no modifications to Zabbix core files.
 
-STRUCTURE (Nov 9, 2025):
-src/
-  ├── Widget.php                    # Widget entry point (CWidget)
-  ├── Module.php                    # Module entry (re-enabled for rescan action)
-  ├── manifest-widget.json          # Widget manifest (id: multigraphwidget)
-  ├── manifest.json                 # Module manifest (re-enabled)
-  ├── actions/
-  │   ├── Test.php                  # Module test action
-  │   ├── Rescan.php                # Module rescan action
-  │   ├── WidgetView.php            # Widget view controller
-  │   └── WidgetEdit.php            # Widget edit controller (ISSUE: color fields not displaying)
-  ├── views/
-  │   ├── multigraph.test.php       # Module test view
-  │   ├── widget.edit.php           # Widget edit form view
-  │   └── widget.view.php           # Widget view template
-  ├── includes/                     # SHARED BACKEND (for B2.2 graph patch)
-  │   ├── ItemMatcher.php           # Regex/wildcard item matching
-  │   ├── GraphRenderer.php         # Core rendering logic with color support
-  │   └── WidgetForm.php            # Widget form fields definition (includes color fields)
-  └── assets/                       # SHARED FRONTEND (for B2.2 graph patch)
-      ├── js/class.widget.js        # Widget JS class (canvas-based rendering, responsive)
-      └── css/multigraph.css        # Styling (theme color variables)
-docker/
-  └── modules_rescan.php            # Standalone helper for manifest inspection
-zabbix-helpers.ps1                  # PowerShell functions (Rescan-ZabbixModules)
+================================================================================
+FUNCTIONAL REQUIREMENTS (D.2.2)
+================================================================================
 
-DEPLOYMENT:
-Widget: /usr/share/zabbix/widgets/multigraph/ (manifest-widget.json → manifest.json)
-Module: /usr/share/zabbix/modules/multigraph/ (re-enabled, moduleid: 36)
-Helper: /usr/share/zabbix/modules_rescan.php (HTTP accessible)
+D.2.2.1: Pattern Matching
+  - Wildcard mode: *, ? characters for simple patterns
+  - Regex mode: Full PCRE regex support
+  - Case-sensitive matching
+  - Max 100 items matched per query (configurable)
 
-DEVELOPMENT PHASES:
-Phase A: ✅ Module registration (moduleid: 36, re-enabled Nov 6)
-Phase B1: ✅ Menu action "Hello World" test
-Phase B2.1: ✅ Widget rendering fixed (moduleid: 38)
-  Nov 6 fixes: Controller base class, manifest format, view template, CSS theme colors
-  Nov 8-9: Added client-side canvas graph rendering, responsive sizing, color configuration
-Phase B2.2: TODO Graph type patch for templates
-Phase B3: TODO Implement regex item matching + rendering
+D.2.2.2: Multi-Host Support
+  - Select multiple hosts
+  - Match items across all selected hosts
 
-CURRENT ISSUES:
-===============
-[RESOLVED Nov 9] Color configuration fields not displaying - Fixed by proper CWidgetView structure
-[RESOLVED Nov 9] JavaScript not executing - Fixed by using setVar() instead of inline scripts
-[RESOLVED Nov 9] Data structure mismatch - Fixed by aligning PHP output with JS expectations
-[RESOLVED Nov 9] Fill opacity issues - Fixed by proper rgba conversion and draw order
-[RESOLVED Nov 9] Hover not working - Fixed by cloning overlay element to reset listeners
-[RESOLVED Nov 9] Invisible text labels - Fixed by using '#000' (black) instead of '#333'
+D.2.2.3: Graph Rendering
+  - HTML5 Canvas dual-layer architecture (base + overlay)
+  - Time series line and area charts
+  - Automatic Y-axis scaling or fixed range
+  - Grid with configurable density
+  - Legend with configurable position (top-left, right, bottom)
 
-Feature: Color modes implemented in GraphRenderer.php:
-  - 'cycle': Repeat colors for items > color count
-  - 'random': Generate random hex colors
-  - 'offset': Darken last color progressively
-  Parser: Splits comma or semicolon-separated hex codes
-  Defaults: '#1f77b4,#ff7f0e,#2ca02c,#d62728,#9467bd', mode='cycle'
+D.2.2.4: Interactivity
+  - Hover tooltips showing value, timestamp, series name
+  - Data point interpolation for smooth hover
+  - Responsive resize with automatic redraw
 
-Graph rendering: Client-side canvas-based (JavaScript), responsive to resize
+D.2.2.5: Customization
+  - Configurable colors (comma-separated hex)
+  - Fill opacity (0-1)
+  - Y-axis range (auto or fixed min/max)
+  - Grid enable/disable
+  - Text colors (legend, axes)
 
-WORKFLOW:
-1. Edit locally → 2. SSH/SCP to Docker host → 3. Deploy to container/rebuild
-4. Test: UI(manual), API(curl), logs(docker/console) → 5. Git commit/push
+D.2.2.6: Timeframe Support
+  - Absolute: Unix timestamp, ISO date strings
+  - Relative: now-Xh, now-Xd, now-Xw, now-XM, now-Xy
+  - Period rounding: now/d (today), now/w (week), now/M (month), now/y (year)
+  - Integration with dashboard time selector
 
-PLUGIN REQS:
-Module.php implements Zabbix interfaces | manifest.json metadata
-Follow naming conventions | Handle sessions/permissions
+================================================================================
+DETAILED CONSTRAINTS (D.2.3)
+================================================================================
 
-DEBUG:
-docker logs/exec | Browser F12 | Zabbix Admin→System Info
+D.2.3.1: Platform Constraints
+  - Zabbix 7.4.3+ widget framework
+  - PHP 8.4+ backend
+  - Modern browser with HTML5 Canvas and ES6 JavaScript
+  - Dashboard (New UI) only - Classic UI not tested
 
-SESSION NOTES (Nov 5-9):
-- Nov 5: Init project, widget created, encountered E1/E2 issues
-- Nov 6: Fixed controller (CControllerDashboardWidgetView), manifest format, view template
-- Nov 6: CSS theme color variables, rescan helper (modules_rescan.php + PS function)
-- Nov 8: Added configurable colors to WidgetForm, attempted multiple UI display approaches
-- Nov 9: Color fields still not displaying despite multiple fix attempts
-- Module rescan: Manual UI required (Zabbix doesn't support custom JSON-RPC API methods)
+D.2.3.2: Performance Constraints
+  - Widget load < 2 seconds (typical)
+  - Max 1000 data points per series (recommended)
+  - Max 100 items matched per query
+  - Canvas rendering up to 4K resolution
 
-HELPERS:
-. .\zabbix-helpers.ps1              # Load PowerShell functions
-Rescan-ZabbixModules                # List modules/widgets, remind to click "Scan directory"
-Or call: http://192.168.254.16:8080/modules_rescan.php?token=TOKEN
+D.2.3.3: Usability Constraints
+  - All fields validated before save
+  - Clear error messages
+  - Graceful "no data" handling
+  - Responsive to all dashboard cell sizes
 
-TODO:
-[x] Configure Zabbix server access for HTTP testing
-[x] Complete Docker host SSH configuration (ai_priv.txt)
-[x] Create initial plugin structure (Module.php, manifest.json)
-[x] Set up Docker deployment configuration
-[x] Create ai.txt
-[x] Fix widget rendering issues (E1, E2)
-[x] Add canvas-based graph rendering (client-side)
-[x] Implement color configuration backend logic
-[ ] FIX: Make color fields visible in widget edit UI (PRIORITY)
-[ ] Phase B3: Implement actual multigraph functionality
-[ ] Phase B2.2: Graph type patch for templates (if needed)
+D.2.3.4: Security Constraints
+  - Zabbix session authentication
+  - Respects user host/item permissions
+  - Input sanitization and validation
+  - XSS prevention in templates
 
-=== END ===
+D.2.3.5: Browser Compatibility
+  - Required: HTML5 Canvas, ES6 JavaScript
+  - Tested: Chrome 90+, Firefox 88+, Edge 90+
+  - Not tested: IE11, Classic Zabbix UI, Safari
+
+================================================================================
+ARCHITECTURAL CONSTRAINTS (D.2.4)
+================================================================================
+
+1. WIDGET FRAMEWORK COMPLIANCE
+   - Must extend Zabbix CWidget base class
+   - MVC pattern: actions/ (controllers), includes/ (models), views/ (templates)
+   - Namespace: Widgets\Multigraph\{Actions|Includes}
+   - PSR-4 autoloading (directory names must match namespace)
+
+2. DATA ACCESS
+   - Use Zabbix API only (no direct database access)
+   - API::Item()::get() for item matching
+   - API::History()::get() for time series data
+
+3. RENDERING ARCHITECTURE
+   - Server-side: PHP controllers prepare data
+   - Client-side: JavaScript renders to Canvas
+   - No server-side image generation
+   - No external JavaScript libraries (jQuery available from Zabbix)
+
+4. DEPLOYMENT ISOLATION
+   - Self-contained in /usr/share/zabbix/widgets/multigraph/
+   - No modifications to Zabbix core files
+   - manifest.json for registration
+   - Scan directory for detection
+
+================================================================================
+PROJECT STRUCTURE (D.2.5)
+================================================================================
+
+multigraph/
+├── README.md                      # Comprehensive project documentation (B.1-B.10)
+├── USAGE.md                       # User and admin manuals (C.1-C.2)
+├── LICENSE                        # MIT License
+├── .gitignore                     # Git exclusions
+├── ai.txt                         # This file - AI context (generic)
+├── ai_priv/                       # Git-ignored local context
+│   ├── ai_priv.txt               # Local paths, credentials, deployment details
+│   └── id_aibot                  # SSH private key for deployment
+│
+├── docker/                        # Deployment helpers
+│   └── modules_rescan.php        # HTTP-accessible module rescan helper
+│
+├── zabbix-helpers.ps1            # PowerShell deployment functions
+│
+├── deprecated/                    # Git-ignored old code (kept for reference)
+│   ├── tmptest/                  # API rescan experiments
+│   └── oldmodule/                # Old module-based approach
+│
+└── src/                           # Widget source (Zabbix-compatible structure)
+    ├── manifest.json              # Widget manifest - registration metadata
+    ├── Widget.php                 # Entry point - extends CWidget
+    ├── README.md                  # Source structure documentation
+    │
+    ├── actions/                   # MVC Controllers
+    │   ├── README.md
+    │   ├── WidgetView.php         # Display controller (data orchestration)
+    │   └── WidgetEdit.php         # Configuration controller
+    │
+    ├── includes/                  # MVC Models + Forms
+    │   ├── README.md
+    │   ├── GraphData.php          # History data fetching and preparation
+    │   ├── MatchedItemsData.php   # Item pattern matching (wildcard/regex)
+    │   └── WidgetForm.php         # Configuration form definition
+    │
+    ├── views/                     # MVC Views / Templates
+    │   ├── README.md
+    │   ├── widget.view.php        # Display template (canvas HTML)
+    │   ├── widget.edit.php        # Configuration form template
+    │   └── widget.edit.js.php     # Configuration JavaScript initialization
+    │
+    └── assets/                    # Frontend resources
+        ├── js/
+        │   ├── README.md
+        │   ├── class.widget.js    # Main widget JavaScript (CWidget extension)
+        │   └── widget.edit.js     # Configuration form JavaScript
+        └── css/
+            ├── README.md
+            └── multigraph.css     # Widget styles
+
+DEPLOYMENT TARGET:
+  /usr/share/zabbix/widgets/multigraph/
+
+================================================================================
+CRITICAL LESSONS LEARNED (D.1 - Kept for AI Reference)
+================================================================================
+
+These are SOLVED issues - solutions documented in code comments and README.md.
+Kept here ONLY for AI context to avoid repeating mistakes.
+
+1. WIDGET DEVELOPMENT WORKFLOW
+   LESSON: Configuration fields, data flow, view templates, JavaScript rendering
+           must ALL align precisely or widget fails silently.
+   SOLUTION: Documented in README.md Section B.10 (Source Structure)
+   CODE: See PHPDoc headers in all source files
+
+2. DATA STRUCTURE SYNCHRONIZATION
+   LESSON: PHP array structure from WidgetView MUST exactly match JavaScript
+           expectations in class.widget.js. Mismatches cause blank widgets.
+   SOLUTION: Documented in class.widget.js::setContents() JSDoc
+   CODE: WidgetView.php prepareGraphData() + class.widget.js structure comments
+
+3. TIMEFRAME PARSING
+   LESSON: Zabbix dashboard time selector uses expressions like "now/w", "now/M"
+           that require special parsing logic for period rounding.
+   SOLUTION: Implemented parseZabbixTime() method in WidgetView.php
+   CODE: WidgetView.php lines 50-150 (parseZabbixTime method with full docs)
+
+4. CANVAS RENDERING ORDER
+   LESSON: Draw order matters: grid → fills → lines → legend. Wrong order causes
+           fills to obscure lines or legend to be unreadable.
+   SOLUTION: Documented in class.widget.js::renderGraph() phases
+   CODE: class.widget.js lines 200-600 (13-phase rendering pipeline)
+
+5. EVENT LISTENER CLEANUP
+   LESSON: Overlay canvas event listeners accumulate on redraw, causing multiple
+           tooltips. Must clone element to remove old listeners.
+   SOLUTION: Documented in class.widget.js hover setup
+   CODE: class.widget.js line ~550 (overlay clone logic)
+
+6. ZABBIX FRAMEWORK CONSTRAINTS
+   LESSON: Zabbix 7.4.3 has NO setHelpHint() method on form fields (unlike docs).
+           Using it causes fatal errors. Must use Zabbix API only, no DB access.
+   SOLUTION: Removed setHelpHint() calls, added inline comments instead
+   CODE: WidgetForm.php (no setHelpHint calls, comments explain fields)
+
+================================================================================
+DEVELOPMENT WORKFLOW
+================================================================================
+
+1. LOCAL DEVELOPMENT
+   - Edit files in c:\Users\plachy\Documents\Dev\Cpp\zabbix\multigraph\
+   - Test locally if possible (requires Zabbix instance)
+   - Git commit changes with descriptive messages
+
+2. DEPLOYMENT TO DOCKER (see ai_priv.txt for specific paths/credentials)
+   - SSH to Docker host: ssh -i ai_priv/id_aibot user@dockerhost
+   - Copy files to host: scp -r src/* user@dockerhost:/tmp/multigraph/
+   - Deploy to container: docker cp /tmp/multigraph zabbix-web:/usr/share/zabbix/widgets/multigraph/
+   - Rebuild image: docker build -t zabbix-web-custom:latest /path/to/customzabbix
+   - Restart container: docker compose restart zabbix-web
+
+3. ENABLE WIDGET IN ZABBIX
+   - Navigate to Administration → General → Modules
+   - Click "Scan directory" button
+   - Enable "Multigraph" widget
+   - Click "Update"
+
+4. TESTING
+   - Create/edit dashboard
+   - Add Multigraph widget
+   - Configure (hosts, pattern, colors, etc.)
+   - Verify graph renders correctly
+   - Check browser console (F12) for JavaScript errors
+   - Test hover tooltips, resize, timeframe changes
+
+5. GIT WORKFLOW
+   - Branch: tmp0.1 (development)
+   - Commit frequently with clear messages
+   - Push to origin: git push origin tmp0.1
+   - Main branch reserved for v1.0.0 release
+
+================================================================================
+DEBUGGING TIPS
+================================================================================
+
+PHP ERRORS:
+  - Check: /var/log/apache2/error.log or /var/log/nginx/error.log
+  - Check: /var/log/php8.4-fpm.log
+  - Enable debug: $DB['DB_DEBUG'] = 1 in /etc/zabbix/web/zabbix.conf.php
+
+JAVASCRIPT ERRORS:
+  - Browser console: F12 → Console tab
+  - Check for: "graph_data is undefined", "querySelector returned null"
+  - Verify container exists: document.querySelector('.multigraph-container')
+  - Verify data structure: console.log(response.graph_data)
+
+DEPLOYMENT ISSUES:
+  - Verify files copied: ls -la /usr/share/zabbix/widgets/multigraph/
+  - Check permissions: chmod -R 755, chown -R www-data:www-data
+  - Verify manifest: cat manifest.json | python -m json.tool
+  - Clear browser cache: Ctrl+Shift+Delete
+
+PATTERN MATCHING ISSUES:
+  - Test pattern manually: Configuration → Hosts → Items → Browser search (Ctrl+F)
+  - Check case sensitivity
+  - Verify regex syntax: regex101.com
+  - Check Zabbix API logs for errors
+
+PERFORMANCE ISSUES:
+  - Reduce timeframe (shorter = fewer data points)
+  - Reduce matched items (more specific pattern)
+  - Check browser performance: F12 → Performance tab
+
+================================================================================
+CURRENT STATUS (November 10, 2025)
+================================================================================
+
+PHASE: B.7 - Documentation (COMPLETED)
+
+COMPLETED:
+  ✅ Phase A: Planning and architecture
+  ✅ Phase B.1: Widget foundation (manifest, MVC structure)
+  ✅ Phase B.2: Graph rendering (Canvas, data fetching)
+  ✅ Phase B.3: Item pattern matching (wildcard, regex)
+  ✅ Phase B.4: Interactivity (hover, resize)
+  ✅ Phase B.5: Configuration (colors, legend, Y-axis, grid)
+  ✅ Phase B.6: Dashboard integration (timeframe parsing, auto-refresh)
+  ✅ Phase B.7: Documentation (code docs, README.md, USAGE.md)
+
+PENDING:
+  📋 Phase C: Testing and Quality
+     - C.1: Unit tests (PHPUnit, Jest)
+     - C.2: Integration tests
+     - C.3: Browser compatibility tests
+     - C.4: Classic UI testing
+     - C.5: Performance testing
+  📋 Phase D: Enhancement
+     - D.1: Export graph (PNG/SVG)
+     - D.2: Usability improvements (pattern builder UI)
+     - D.3: Additional chart types (bar, scatter, heatmap)
+  📋 Phase E: Release 1.0.0
+     - E.1: All testing complete
+     - E.2: Documentation complete
+     - E.3: Deployment automation
+     - E.4: Release notes
+
+KNOWN ISSUES:
+  - Classic UI compatibility: UNTESTED (may not work)
+  - Large dataset performance: NOT OPTIMIZED (> 1000 points per series)
+  - No automated testing: Manual testing only
+  - Item limit not configurable: Hardcoded to 100 in MatchedItemsData.php
+
+VERSION HISTORY:
+  v0.1.0 (2025-11-10) - Current development version
+    - Core functionality complete
+    - Documentation complete
+    - Testing framework not yet implemented
+    - Status: Functional but untested for production
+
+NEXT MILESTONE: Phase C - Testing and Quality
+
+================================================================================
+HELPERS AND TOOLS
+================================================================================
+
+COMMON COMMANDS:
+
+**Git Operations:**
+```bash
+git status                                    # Check working tree status
+git add .                                     # Stage all changes
+git add README.md USAGE.md ai.txt             # Stage specific files
+git commit -m "Update documentation"          # Commit with message
+git push origin tmp0.1                        # Push to development branch
+git log --oneline -n 10                       # View recent commits
+git diff                                      # View unstaged changes
+git diff --staged                             # View staged changes
+```
+
+**Docker Deployment (manual steps):**
+```bash
+# Copy files to Docker host
+scp -i ~/.ssh/id_aibot -r src/* aibot@192.168.254.16:/root/customzabbix/usr/share/zabbix/widgets/multigraph/
+
+# SSH to Docker host
+ssh -i ~/.ssh/id_aibot aibot@192.168.254.16
+
+# Build image
+cd /root/customzabbix
+sudo docker build -t zabbix-web-custom:latest .
+
+# Restart container
+sudo docker-compose -f /root/docker-compose.yml restart zabbix-web
+
+# Verify deployment
+sudo docker exec zabbix-web ls -la /usr/share/zabbix/widgets/multigraph/
+```
+
+**PowerShell Deployment (Windows):**
+```powershell
+# Copy files to Docker host
+scp -i .\ai_priv\id_aibot -r .\src\* aibot@192.168.254.16:/root/customzabbix/usr/share/zabbix/widgets/multigraph/
+
+# Build and restart via SSH
+ssh -i .\ai_priv\id_aibot aibot@192.168.254.16 "cd /root/customzabbix && sudo docker build -t zabbix-web-custom:latest . && sudo docker-compose restart zabbix-web"
+```
+
+**Docker Container Inspection:**
+```bash
+# List containers
+docker ps -a | grep zabbix
+
+# View logs
+docker logs zabbix-web
+docker logs -f --tail 100 zabbix-web
+
+# Enter container
+docker exec -it zabbix-web bash
+
+# Check files inside container
+docker exec zabbix-web ls -la /usr/share/zabbix/widgets/multigraph/
+
+# Copy logs from container
+docker cp zabbix-web:/var/log/apache2/error.log ./error.log
+```
+
+**Zabbix Module Scanning:**
+```bash
+# HTTP helper for module information (if deployed)
+curl http://192.168.254.16:8080/modules_rescan.php
+
+# Manual: Use Zabbix UI
+# Administration → General → Modules → "Scan directory" button
+```
+
+**Debugging Commands:**
+```bash
+# Check PHP errors (inside container or on host)
+tail -f /var/log/apache2/error.log
+tail -f /var/log/php8.4-fpm.log
+
+# Search for widget errors
+grep -i "multigraph" /var/log/apache2/error.log
+docker logs zabbix-web 2>&1 | grep -i "multigraph"
+
+# Verify file permissions
+ls -la /usr/share/zabbix/widgets/multigraph/
+stat /usr/share/zabbix/widgets/multigraph/manifest.json
+
+# Test JSON syntax
+cat manifest.json | python -m json.tool
+```
+
+**Note:** Specific deployment paths/credentials are in ai_priv.txt (git-ignored).
+For complete deployment scripts, see README.md (Section B.9) and USAGE.md (Section C.2.2).
+
+================================================================================
+DOCUMENTATION REFERENCES
+================================================================================
+
+COMPREHENSIVE DOCS:
+  - README.md: Project overview, architecture, requirements (B.1-B.10)
+  - USAGE.md: User manual, admin manual, troubleshooting (C.1-C.2)
+  - src/README.md: Source structure details
+  - src/*/README.md: Directory-specific documentation
+
+CODE DOCUMENTATION:
+  - All PHP files: Comprehensive PHPDoc headers and method docs
+  - All JavaScript files: Comprehensive JSDoc headers and method docs
+  - All CSS files: Inline comments explaining strategies
+
+EXTERNAL REFERENCES:
+  - Zabbix Documentation: https://www.zabbix.com/documentation/current/
+  - Zabbix Widget Development: Limited official docs, reverse-engineered from core
+  - PHP 8.4: https://www.php.net/manual/en/
+  - HTML5 Canvas: https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API
+  - PCRE Regex: https://www.pcre.org/original/doc/html/pcrepattern.html
+
+================================================================================
+FOR AI ASSISTANTS
+================================================================================
+
+WHEN STARTING NEW SESSION:
+1. Read this file (ai.txt) for project context
+2. Read ai_priv.txt for local environment details
+3. Review README.md for architecture and requirements
+4. Check USAGE.md for user/admin operational details
+5. Review relevant source files for code context
+
+WHEN MODIFYING CODE:
+1. Follow MVC pattern (actions/, includes/, views/)
+2. Update PHPDoc/JSDoc headers
+3. Test deployment before committing
+4. Update README.md if architecture changes
+5. Update USAGE.md if user-facing behavior changes
+6. Clean up ai.txt/ai_priv.txt when problems are solved
+
+WHEN ENCOUNTERING ISSUES:
+1. Check "CRITICAL LESSONS LEARNED" section above
+2. Review source code comments (solutions often documented inline)
+3. Check README.md relevant sections
+4. Review USAGE.md troubleshooting guide (C.2.4)
+5. Only add to ai.txt if new lesson not already documented
+
+WHEN PROBLEM IS SOLVED:
+1. Document solution in code (PHPDoc/JSDoc comment where fix applied)
+2. Document in README.md if architectural
+3. Document in USAGE.md if user-facing
+4. REMOVE problem description from ai.txt/ai_priv.txt
+5. Keep context files focused on CURRENT state
+
+================================================================================
+END OF AI CONTEXT
+================================================================================
