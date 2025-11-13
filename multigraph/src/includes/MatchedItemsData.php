@@ -150,16 +150,37 @@ class MatchedItemsData {
 	/**
 	 * Convert wildcard pattern to regex
 	 * 
+	 * PURPOSE:
+	 * Converts user-friendly wildcard patterns (* and ?) to regex patterns.
+	 * Handles special characters including % (common in Zabbix item names like "Disk C: free %").
+	 * 
+	 * DEPENDENCIES:
+	 * - Called by: matchPattern() for wildcard mode matching
+	 * 
+	 * ALGORITHM:
+	 * 1. Escape all regex special chars (including %)
+	 * 2. Convert escaped wildcards \* and \? back to regex .* and .
+	 * 3. Add anchors ^ and $ for full string match
+	 * 
+	 * SPECIAL HANDLING:
+	 * - % character is escaped by preg_quote and stays escaped in output
+	 * - This matches literal % in item names (e.g., "Disk C: free %")
+	 * 
 	 * @param string $wildcard Wildcard pattern (* and ?)
-	 * @return string Regex pattern
+	 * @return string Regex pattern (without delimiters)
 	 */
 	public static function wildcardToRegex(string $wildcard): string {
 		// Escape regex special chars except * and ?
+		// preg_quote() escapes: . \ + * ? [ ^ ] $ ( ) { } = ! < > | : - #
+		// This includes % which becomes \% (literal % in regex)
 		$pattern = preg_quote($wildcard, '/');
 		
-		// Convert wildcards to regex
+		// Convert escaped wildcards to regex equivalents
+		// \* → .* (any characters)
+		// \? → .  (any single character)
 		$pattern = str_replace(['\*', '\?'], ['.*', '.'], $pattern);
 		
+		// Add anchors for exact match
 		return '^' . $pattern . '$';
 	}
 }

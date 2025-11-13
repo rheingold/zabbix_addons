@@ -511,42 +511,51 @@ CURRENT TODO LIST
 ================================================================================
 Last Updated: November 13, 2025
 
-PRIORITY 1 - IMMEDIATE:
-[✓] 1. Increase default widget size (4x wider) - COMPLETED v0.1.3
-    - Modified manifest.json: width 12 → 48
+PRIORITY 1 - IMMEDIATE (v0.1.4):
+[✓] 1. Fix widget width (was too wide) - COMPLETED v0.1.4
+    - Reduced from 48 to 36 units (3/4 of 48, ~1/2 dashboard width)
+    - Modified manifest.json
 
-[✓] 2. Fix template dashboard compatibility - COMPLETED v0.1.3
-    - Modified WidgetForm.php validation to detect template context
-    - Skips hostid/item_pattern requirement when templateid present
+[?] 2. Fix template dashboard save issue - NEEDS TESTING v0.1.4
+    - Removed FLAG_NOT_EMPTY from item_pattern field
+    - Allows empty pattern in template dashboards
+    - Modified WidgetForm.php addFields()
+    - User reported: Widget still shows "Please configure the widget"
+    
+[?] 3. Fix Item pattern with % character - NEEDS TESTING v0.1.4
+    - Added documentation to MatchedItemsData::wildcardToRegex()
+    - preg_quote() correctly escapes % to \% for literal match
+    - User reported: Pattern text with % not saved
+    - May be Zabbix core issue if problem persists
 
 PRIORITY 2 - FEATURES:
-[ ] 3. Implement missing data handling options
+[ ] 4. Implement missing data handling options
     - Add config option: 'empty', 'zero on X', 'ZeroAbsolute', 'connect'
     - Trigger when >10% width OR >100% avg distance missing
     - Add widget form field and rendering logic
 
-[ ] 4. Add bar chart graph type
+[ ] 5. Add bar chart graph type
     - Add dropdown in widget form
     - Implement bar rendering in class.widget.js
     - Proper spacing and bar width calculations
 
-[ ] 5. Add distribution/histogram graph type
+[ ] 6. Add distribution/histogram graph type
     - Y-axis shows count of values in intervals
     - If param is single integer, auto-generate that many intervals
     - Add config fields for interval definition
 
-[ ] 6. Improve X-axis time labels
+[ ] 7. Improve X-axis time labels
     - Better reflect selected from-to interval length
     - Enhance adaptive time formatting
     - Show appropriate granularity based on time range
 
-[ ] 7. Add interactive pattern builder UI
+[ ] 8. Add interactive pattern builder UI
     - Modal popup for item prototype selection
     - Show {#MACROS}, click to select
     - Auto-convert {#DISK} to .* pattern
     - AJAX call to fetch item prototypes
 
-[ ] 8. Implement named color sets
+[ ] 9. Implement named color sets
     - Pre-set color schemes: 'SetName:#RRGGBB,#RRGGBB,...'
     - Name before ':' ignored during rendering
     - Configurable in manifest or PHP constant
@@ -557,8 +566,11 @@ COMPLETED:
 [✓] Highlight circles on hover (v0.1.2)
 [✓] Fixed canvas overlay rendering bug (v0.1.2)
 [✓] Fixed scrollbar issue (v0.1.2)
-[✓] Default widget width 4x larger (v0.1.3)
-[✓] Template dashboard support (v0.1.3)
+[✓] Default widget width increased to 48 (v0.1.3 - too wide)
+[✓] Template dashboard detection added (v0.1.3 - incomplete)
+[✓] Default widget width adjusted to 36 (v0.1.4)
+[✓] Template dashboard FLAG_NOT_EMPTY removed (v0.1.4)
+[✓] % character handling documented (v0.1.4)
 
 ================================================================================
 FOR AI ASSISTANTS

@@ -4,13 +4,13 @@
   "id": "multigraphwidget",
   "name": "Multigraph",
   "namespace": "Multigraph",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "author": "Lukas Plachy",
   "description": "Enhanced multi-graph visualization with regex item matching",
   "url": "https://github.com/rheingold/zabbix_addons",
   "widget": {
     "size": {
-      "width": 48,
+      "width": 36,
       "height": 5
     },
     "js_class": "CWidgetMultigraph"

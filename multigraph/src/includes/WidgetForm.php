@@ -158,7 +158,9 @@ class WidgetForm extends CWidgetForm {
 			)
 			->addField(
 				(new CWidgetFieldTextBox('item_pattern', _('Item pattern')))
-					->setFlags(CWidgetField::FLAG_NOT_EMPTY | CWidgetField::FLAG_LABEL_ASTERISK)
+					// Remove FLAG_NOT_EMPTY to allow empty pattern in template dashboards
+					// Validation is handled in validate() method based on context
+					->setFlags(CWidgetField::FLAG_LABEL_ASTERISK)
 			)
 			->addField(
 				(new CWidgetFieldRadioButtonList('pattern_mode', _('Pattern mode'), [
