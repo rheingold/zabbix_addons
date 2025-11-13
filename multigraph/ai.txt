@@ -507,6 +507,60 @@ EXTERNAL REFERENCES:
   - PCRE Regex: https://www.pcre.org/original/doc/html/pcrepattern.html
 
 ================================================================================
+CURRENT TODO LIST
+================================================================================
+Last Updated: November 13, 2025
+
+PRIORITY 1 - IMMEDIATE:
+[✓] 1. Increase default widget size (4x wider) - COMPLETED v0.1.3
+    - Modified manifest.json: width 12 → 48
+
+[✓] 2. Fix template dashboard compatibility - COMPLETED v0.1.3
+    - Modified WidgetForm.php validation to detect template context
+    - Skips hostid/item_pattern requirement when templateid present
+
+PRIORITY 2 - FEATURES:
+[ ] 3. Implement missing data handling options
+    - Add config option: 'empty', 'zero on X', 'ZeroAbsolute', 'connect'
+    - Trigger when >10% width OR >100% avg distance missing
+    - Add widget form field and rendering logic
+
+[ ] 4. Add bar chart graph type
+    - Add dropdown in widget form
+    - Implement bar rendering in class.widget.js
+    - Proper spacing and bar width calculations
+
+[ ] 5. Add distribution/histogram graph type
+    - Y-axis shows count of values in intervals
+    - If param is single integer, auto-generate that many intervals
+    - Add config fields for interval definition
+
+[ ] 6. Improve X-axis time labels
+    - Better reflect selected from-to interval length
+    - Enhance adaptive time formatting
+    - Show appropriate granularity based on time range
+
+[ ] 7. Add interactive pattern builder UI
+    - Modal popup for item prototype selection
+    - Show {#MACROS}, click to select
+    - Auto-convert {#DISK} to .* pattern
+    - AJAX call to fetch item prototypes
+
+[ ] 8. Implement named color sets
+    - Pre-set color schemes: 'SetName:#RRGGBB,#RRGGBB,...'
+    - Name before ':' ignored during rendering
+    - Configurable in manifest or PHP constant
+    - Add dropdown in widget form
+
+COMPLETED:
+[✓] Hover tooltip functionality (v0.1.2)
+[✓] Highlight circles on hover (v0.1.2)
+[✓] Fixed canvas overlay rendering bug (v0.1.2)
+[✓] Fixed scrollbar issue (v0.1.2)
+[✓] Default widget width 4x larger (v0.1.3)
+[✓] Template dashboard support (v0.1.3)
+
+================================================================================
 FOR AI ASSISTANTS
 ================================================================================
 
