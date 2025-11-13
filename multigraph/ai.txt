@@ -511,51 +511,54 @@ CURRENT TODO LIST
 ================================================================================
 Last Updated: November 13, 2025
 
-PRIORITY 1 - IMMEDIATE (v0.1.4):
-[✓] 1. Fix widget width (was too wide) - COMPLETED v0.1.4
-    - Reduced from 48 to 36 units (3/4 of 48, ~1/2 dashboard width)
-    - Modified manifest.json
+PRIORITY 1 - IMMEDIATE (v0.1.5):
+[✓] 1. Fix widget width - COMPLETED v0.1.4
+    - Reduced from 48 to 36 units (user confirmed OK)
 
-[?] 2. Fix template dashboard save issue - NEEDS TESTING v0.1.4
-    - Removed FLAG_NOT_EMPTY from item_pattern field
-    - Allows empty pattern in template dashboards
-    - Modified WidgetForm.php addFields()
-    - User reported: Widget still shows "Please configure the widget"
+[✓] 2. Fix 500 error - widget won't load - COMPLETED v0.1.5
+    - ERROR: Call to undefined method hasInput() in WidgetForm
+    - CAUSE: hasInput() only available in controllers, not form classes
+    - FIX: Removed template detection from validate() method
+    - Made item_pattern fully optional (relies on FLAG_NOT_EMPTY removal)
+    - Widget should now load and save without errors
+
+[?] 3. Template dashboard save - NEEDS TESTING v0.1.5
+    - With FLAG_NOT_EMPTY removed and validation simplified
+    - Widget should save in template dashboards without item pattern
+    - Will show "Please configure the widget" until pattern is set
     
-[?] 3. Fix Item pattern with % character - NEEDS TESTING v0.1.4
-    - Added documentation to MatchedItemsData::wildcardToRegex()
-    - preg_quote() correctly escapes % to \% for literal match
-    - User reported: Pattern text with % not saved
-    - May be Zabbix core issue if problem persists
+[?] 4. Item pattern with % character - NEEDS TESTING v0.1.5
+    - preg_quote() handles % correctly (escapes to \%)
+    - Pattern should save and match item names with % (e.g., "Disk C: free %")
 
 PRIORITY 2 - FEATURES:
-[ ] 4. Implement missing data handling options
+[ ] 5. Implement missing data handling options
     - Add config option: 'empty', 'zero on X', 'ZeroAbsolute', 'connect'
     - Trigger when >10% width OR >100% avg distance missing
     - Add widget form field and rendering logic
 
-[ ] 5. Add bar chart graph type
+[ ] 6. Add bar chart graph type
     - Add dropdown in widget form
     - Implement bar rendering in class.widget.js
     - Proper spacing and bar width calculations
 
-[ ] 6. Add distribution/histogram graph type
+[ ] 7. Add distribution/histogram graph type
     - Y-axis shows count of values in intervals
     - If param is single integer, auto-generate that many intervals
     - Add config fields for interval definition
 
-[ ] 7. Improve X-axis time labels
+[ ] 8. Improve X-axis time labels
     - Better reflect selected from-to interval length
     - Enhance adaptive time formatting
     - Show appropriate granularity based on time range
 
-[ ] 8. Add interactive pattern builder UI
+[ ] 9. Add interactive pattern builder UI
     - Modal popup for item prototype selection
     - Show {#MACROS}, click to select
     - Auto-convert {#DISK} to .* pattern
     - AJAX call to fetch item prototypes
 
-[ ] 9. Implement named color sets
+[ ] 10. Implement named color sets
     - Pre-set color schemes: 'SetName:#RRGGBB,#RRGGBB,...'
     - Name before ':' ignored during rendering
     - Configurable in manifest or PHP constant
@@ -566,11 +569,12 @@ COMPLETED:
 [✓] Highlight circles on hover (v0.1.2)
 [✓] Fixed canvas overlay rendering bug (v0.1.2)
 [✓] Fixed scrollbar issue (v0.1.2)
-[✓] Default widget width increased to 48 (v0.1.3 - too wide)
-[✓] Template dashboard detection added (v0.1.3 - incomplete)
 [✓] Default widget width adjusted to 36 (v0.1.4)
-[✓] Template dashboard FLAG_NOT_EMPTY removed (v0.1.4)
-[✓] % character handling documented (v0.1.4)
+[✓] Fixed 500 error from hasInput() call (v0.1.5)
+
+KNOWN ISSUES (v0.1.5):
+- Template dashboard: Widget saves but shows "Please configure" until pattern set
+- % character: May have Zabbix core encoding issues (needs user testing)
 
 ================================================================================
 FOR AI ASSISTANTS

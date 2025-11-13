@@ -117,13 +117,14 @@ class WidgetForm extends CWidgetForm {
 	 * - Calls: parent::validate() for base validation
 	 * 
 	 * VALIDATION RULES:
-	 * - item_pattern: Required in host dashboards, optional in template dashboards
+	 * - item_pattern: No longer enforced as required (removed FLAG_NOT_EMPTY)
+	 *   - Allows empty pattern for template dashboards
+	 *   - WidgetView will handle empty pattern gracefully (show appropriate message)
 	 * - Other fields: Validated by parent (type checking, ranges, etc.)
 	 * 
-	 * CRITICAL: Template Dashboard Support
-	 * - In template dashboards, hostid is not available (templates don't have hosts until applied)
-	 * - Item pattern validation is skipped when in template context
-	 * - Detection: Check if hasInput('templateid') or context contains templateid
+	 * TEMPLATE DASHBOARD SUPPORT:
+	 * - Template dashboards can save widgets without item pattern
+	 * - Pattern can be configured after dashboard is applied to hosts
 	 * 
 	 * @param bool $strict Whether to perform strict validation
 	 * 
@@ -132,21 +133,9 @@ class WidgetForm extends CWidgetForm {
 	public function validate(bool $strict = false): array {
 		$errors = parent::validate($strict); // Perform base validation (field types, ranges, etc.)
 
-		if ($errors) {
-			return $errors;
-		}
-
-		// Check if we're in a template dashboard context
-		// In template dashboards, hostids and item patterns may not be fully specified yet
-		$is_template_dashboard = $this->hasInput('templateid') || 
-		                          (method_exists($this, 'getContext') && 
-		                           isset($this->getContext()['templateid']));
-
-		// Item pattern is required only in non-template dashboards
-		if (!$is_template_dashboard && !$this->getFieldValue('item_pattern')) {
-			$errors[] = _s('Invalid parameter "%1$s": %2$s.', _('Item pattern'), _('cannot be empty'));
-		}
-
+		// No additional validation needed - parent handles all field type checks
+		// Item pattern is optional (FLAG_NOT_EMPTY removed) to support template dashboards
+		
 		return $errors;
 	}
 
