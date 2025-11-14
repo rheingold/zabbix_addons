@@ -160,10 +160,27 @@ window.widget_form = new class extends CWidgetForm {
 			}
 		});
 
+		// If no hosts found, try to find templateid (for template dashboards)
+		if (hostids.length === 0) {
+			const templateid_inputs = form.querySelectorAll('input[name^="templateid"]');
+			const templateids = [];
+			templateid_inputs.forEach(input => {
+				if (input.value) {
+					templateids.push(input.value);
+				}
+			});
+			
+			if (templateids.length > 0) {
+				// Template context - use first templateid
+				this.showItemList(templateids[0], true);
+				return;
+			}
+		}
+
 		if (hostids.length === 0) {
 			overlayDialogue({
 				'title': 'Error',
-				'content': jQuery('<span>').text('Please select a host first.'),
+				'content': jQuery('<span>').text('Please select a host or template first.'),
 				'buttons': [
 					{
 						'title': 'Ok',
@@ -176,13 +193,13 @@ window.widget_form = new class extends CWidgetForm {
 		}
 
 		// Use first selected host
-		this.showItemList(hostids[0]);
+		this.showItemList(hostids[0], false);
 	}
 
 	/**
 	 * Show item list via AJAX
 	 */
-	showItemList(hostid) {
+	showItemList(hostid, isTemplate = false) {
 		const form = document.getElementById('widget-dialogue-form') || 
 		             document.querySelector('form[name="widget_dialogue_form"]') ||
 		             this._item_pattern?.closest('form');
@@ -190,7 +207,7 @@ window.widget_form = new class extends CWidgetForm {
 		
 		const curl = new Curl('zabbix.php');
 		curl.setArgument('action', 'widget.multigraphwidget.itemlist');
-		curl.setArgument('hostid', hostid);
+		curl.setArgument(isTemplate ? 'templateid' : 'hostid', hostid);
 		curl.setArgument('pattern_mode', pattern_mode);
 		
 		jQuery.ajax({

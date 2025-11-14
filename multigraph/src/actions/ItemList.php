@@ -61,11 +61,12 @@ class ItemList extends CController {
 	/**
 	 * Check input parameters
 	 * 
-	 * @return bool True if hostid parameter is valid
+	 * @return bool True if hostid or templateid parameter is valid
 	 */
 	protected function checkInput(): bool {
 		$fields = [
-			'hostid' => 'required|db hosts.hostid' // Validate hostid exists
+			'hostid' => 'db hosts.hostid',
+			'templateid' => 'db hosts.hostid'  // Templates are in hosts table with status=3
 		];
 
 		$ret = $this->validateInput($fields);
@@ -76,6 +77,13 @@ class ItemList extends CController {
 			);
 		}
 
+		// At least one of hostid or templateid must be provided
+		if ($ret && !$this->hasInput('hostid') && !$this->hasInput('templateid')) {
+			header('Content-Type: application/json');
+			echo json_encode(['error' => 'Either hostid or templateid must be provided']);
+			exit;
+		}
+
 		return $ret;
 	}
 
@@ -83,7 +91,7 @@ class ItemList extends CController {
 	 * Main action - fetch and return item list
 	 * 
 	 * PURPOSE:
-	 * 1. Fetch regular items from host
+	 * 1. Fetch regular items from host or template
 	 * 2. Fetch item prototypes (LLD items)
 	 * 3. Combine and sort by name
 	 * 4. Return as JSON
@@ -91,18 +99,25 @@ class ItemList extends CController {
 	 * ALGORITHM:
 	 * - Uses API::Item()->get() for regular items
 	 * - Uses API::ItemPrototype()->get() for LLD items
+	 * - Supports both hostids and templateids
 	 * - Preserves {#MACRO} notation in item names
 	 * 
 	 * @return void
 	 */
 	protected function doAction(): void {
-		$hostid = $this->getInput('hostid');
+		$hostid = $this->getInput('hostid', null);
+		$templateid = $this->getInput('templateid', null);
+
+		// Determine which ID to use and set appropriate parameter
+		$is_template = ($templateid !== null);
+		$id = $is_template ? $templateid : $hostid;
+		$id_param = $is_template ? 'templateids' : 'hostids';
 
 		try {
 			// Fetch regular items
 			$regular_items = API::Item()->get([
 				'output' => ['itemid', 'name', 'key_'],
-				'hostids' => $hostid,
+				$id_param => $id,
 				'filter' => [
 					'flags' => ZBX_FLAG_DISCOVERY_NORMAL // Regular items only
 				],
@@ -113,7 +128,7 @@ class ItemList extends CController {
 			// Fetch item prototypes (LLD items with {#MACROS})
 			$item_prototypes = API::ItemPrototype()->get([
 				'output' => ['itemid', 'name', 'key_'],
-				'hostids' => $hostid,
+				$id_param => $id,
 				'sortfield' => 'name',
 				'limit' => 1000
 			]);
