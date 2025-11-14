@@ -692,6 +692,17 @@ func main() {
 
 	debugLog(DBG_INFO, "Metrics registered, collector sampling started")
 
+	// INITIAL RESET: Clear any stale data from collector initialization
+	// This ensures fresh state and that first query gets clean data from time zero
+	debugLog(DBG_VERBOSE, "Performing initial collector reset for clean state...")
+	buffer := make([]byte, 4096)
+	for _, metricName := range []string{"cpu_load", "mem_free", "disk.io.read", "disk.io.write"} {
+		cMetric := C.CString(metricName)
+		C.collector_fetch_and_reset_json(cMetric, (*C.char)(unsafe.Pointer(&buffer[0])), C.uint(len(buffer)))
+		C.free(unsafe.Pointer(cMetric))
+	}
+	debugLog(DBG_VERBOSE, "Initial collector reset complete - all metrics zeroed")
+
 	// PRELOAD: Wait for baseline establishment before accepting queries
 	// Windows sampling requires TWO calls: first establishes baseline, second returns data
 	// Collector samples every 1 second, so wait for initial baseline + configured preload delay
