@@ -34,7 +34,8 @@ use CControllerResponseData; // Response wrapper for passing data to views
 use Widgets\Multigraph\Includes\WidgetForm; // Widget form field definitions
 use Zabbix\Widgets\Fields\{ // Zabbix widget field types for manual field creation
 	CWidgetFieldTextBox,      // Text input fields
-	CWidgetFieldRadioButtonList // Radio button selection fields
+	CWidgetFieldRadioButtonList, // Radio button selection fields
+	CWidgetFieldSelect         // Dropdown select fields
 };
 
 /**
@@ -68,6 +69,16 @@ class WidgetEdit extends CControllerDashboardWidgetEdit {
 	protected function doAction(): void {
 		$form = new WidgetForm($this->widget->fields_values); // Initialize form with current widget configuration
 		$fields = $form->fieldsToView(); // Convert form fields to view-ready format
+		
+		// Manually create color_set field if it doesn't exist or is null
+		if (!isset($fields['color_set']) || $fields['color_set'] === null) {
+			$color_set_field = new CWidgetFieldSelect('color_set', _('Color set'), array_combine(
+				array_keys(WidgetForm::COLOR_SETS),
+				array_map(function($v) { return explode(':', $v)[0]; }, WidgetForm::COLOR_SETS)
+			));
+			$color_set_field->setValue($this->widget->fields_values['color_set'] ?? 'default');
+			$fields['color_set'] = $color_set_field;
+		}
 		
 		// Manually create color fields if they don't exist or are null
 		if (!isset($fields['graph_colors']) || $fields['graph_colors'] === null) {

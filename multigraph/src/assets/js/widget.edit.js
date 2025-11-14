@@ -64,8 +64,21 @@ window.widget_form = new class extends CWidgetForm {
 		this._item_pattern = document.getElementById('item_pattern'); // Item pattern text field
 		this._pattern_mode = document.getElementById('pattern_mode'); // Pattern mode radio buttons
 		this._graph_type = document.getElementById('graph_type');     // Graph type radio buttons
-		this._color_set = document.getElementById('color_set');       // Color set dropdown
-		this._graph_colors = document.getElementById('graph_colors'); // Graph colors text field
+		
+		// Try multiple ways to find the color set field (Zabbix may add prefixes)
+		this._color_set = document.getElementById('color_set') || 
+		                  document.querySelector('[name="color_set"]') ||
+		                  document.querySelector('select[id*="color_set"]');
+		this._graph_colors = document.getElementById('graph_colors') ||
+		                     document.querySelector('[name="graph_colors"]') ||
+		                     document.querySelector('input[id*="graph_colors"]');
+		
+		console.log('Found fields:', {
+			color_set: this._color_set,
+			graph_colors: this._graph_colors,
+			color_set_id: this._color_set?.id,
+			graph_colors_id: this._graph_colors?.id
+		});
 		
 		// Define color sets (must match PHP WidgetForm::COLOR_SETS)
 		this._color_sets = {
@@ -95,14 +108,20 @@ window.widget_form = new class extends CWidgetForm {
 		
 		// Setup color set selector handler
 		if (this._color_set && this._graph_colors) {
+			console.log('Color set handler installed, color_set:', this._color_set, 'graph_colors:', this._graph_colors);
 			this._color_set.addEventListener('change', () => {
 				const selectedSet = this._color_set.value;
+				console.log('Color set changed to:', selectedSet);
 				if (selectedSet && this._color_sets[selectedSet]) {
+					console.log('Setting graph_colors to:', this._color_sets[selectedSet]);
 					this._graph_colors.value = this._color_sets[selectedSet];
 					// Trigger change event to notify Zabbix form of the update
 					this._graph_colors.dispatchEvent(new Event('change', { bubbles: true }));
+					console.log('graph_colors field value after update:', this._graph_colors.value);
 				}
 			});
+		} else {
+			console.log('Color set handler NOT installed - color_set:', this._color_set, 'graph_colors:', this._graph_colors);
 		}
 		
 		// Setup graph type change handler for conditional field visibility
