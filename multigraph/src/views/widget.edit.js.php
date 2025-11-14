@@ -35,6 +35,7 @@ window.widget_form = new class extends CWidgetForm {
 	constructor() {
 		super();
 		this.setupColorSetHandler();
+		this.setupPatternBuilder();
 	}
 
 	/**
@@ -62,7 +63,8 @@ window.widget_form = new class extends CWidgetForm {
 	 * Find form fields and setup event handler
 	 */
 	trySetupFields() {
-		const form = document.getElementById('widget-dialogue-form') || this._form;
+		const form = document.getElementById('widget-dialogue-form') || 
+		             document.querySelector('form[name="widget_dialogue_form"]');
 		
 		const color_set = form?.querySelector('select[name="color_set"]') || 
 		                  document.querySelector('select[name="color_set"]') ||
@@ -86,6 +88,241 @@ window.widget_form = new class extends CWidgetForm {
 			});
 			
 			this._handler_installed = true;
+		}
+	}
+
+	/**
+	 * Setup Pattern Builder button
+	 */
+	setupPatternBuilder() {
+		// Try to find and setup button immediately and after delays
+		this.trySetupPatternBuilder();
+		setTimeout(() => this.trySetupPatternBuilder(), 100);
+		setTimeout(() => this.trySetupPatternBuilder(), 500);
+	}
+
+	/**
+	 * Find item_pattern field and add Pattern Builder button
+	 */
+	trySetupPatternBuilder() {
+		if (this._pattern_button_installed) {
+			return;
+		}
+
+		const form = document.getElementById('widget-dialogue-form') || 
+		             document.querySelector('form[name="widget_dialogue_form"]');
+		
+		const item_pattern = form?.querySelector('input[name="item_pattern"]') ||
+		                     document.querySelector('input[name="item_pattern"]') ||
+		                     document.getElementById('item_pattern');
+
+		if (item_pattern && item_pattern.parentNode) {
+			const button = document.createElement('button');
+			button.type = 'button';
+			button.className = 'btn-alt';
+			button.textContent = 'Pattern Builder';
+			button.style.marginLeft = '5px';
+			
+			item_pattern.parentNode.insertBefore(button, item_pattern.nextSibling);
+			
+			button.addEventListener('click', () => {
+				this.openItemSelector();
+			});
+			
+			this._pattern_button_installed = true;
+			this._item_pattern = item_pattern;
+		}
+	}
+
+	/**
+	 * Open item selector dialog
+	 */
+	openItemSelector() {
+		const form = document.getElementById('widget-dialogue-form') || 
+		             document.querySelector('form[name="widget_dialogue_form"]') ||
+		             this._item_pattern?.closest('form');
+		
+		// Find hostids from multiselect
+		let hostid_inputs = form.querySelectorAll('input[name^="hostids["]');
+		
+		if (hostid_inputs.length === 0) {
+			hostid_inputs = form.querySelectorAll('input[name="hostids_"]');
+		}
+		
+		if (hostid_inputs.length === 0) {
+			hostid_inputs = form.querySelectorAll('input[name*="hostids"]');
+		}
+		
+		const hostids = [];
+		hostid_inputs.forEach(input => {
+			if (input.value) {
+				hostids.push(input.value);
+			}
+		});
+
+		if (hostids.length === 0) {
+			overlayDialogue({
+				'title': 'Error',
+				'content': jQuery('<span>').text('Please select a host first.'),
+				'buttons': [
+					{
+						'title': 'Ok',
+						'focused': true,
+						'action': function() {}
+					}
+				]
+			});
+			return;
+		}
+
+		// Use first selected host
+		this.showItemList(hostids[0]);
+	}
+
+	/**
+	 * Show item list via AJAX
+	 */
+	showItemList(hostid) {
+		const form = document.getElementById('widget-dialogue-form') || 
+		             document.querySelector('form[name="widget_dialogue_form"]') ||
+		             this._item_pattern?.closest('form');
+		const pattern_mode = form?.querySelector('input[name="pattern_mode"]:checked')?.value || '0';
+		
+		const curl = new Curl('zabbix.php');
+		curl.setArgument('action', 'widget.multigraphwidget.itemlist');
+		curl.setArgument('hostid', hostid);
+		curl.setArgument('pattern_mode', pattern_mode);
+		
+		jQuery.ajax({
+			url: curl.getUrl(),
+			method: 'GET',
+			dataType: 'json',
+			success: (response) => {
+				console.log('AJAX response:', response);
+				
+				if (response.error) {
+					const errorMsg = typeof response.error === 'string' 
+						? response.error 
+						: JSON.stringify(response.error);
+					overlayDialogue({
+						'title': 'Error',
+						'content': jQuery('<span>').text(errorMsg),
+						'buttons': [
+							{
+								'title': 'Ok',
+								'focused': true,
+								'action': function() {}
+							}
+						]
+					});
+				} else if (response.items && Array.isArray(response.items)) {
+					console.log('Got items:', response.items.length);
+					this.displayItemSelector(response.items);
+				} else {
+					console.error('Unexpected response format:', response);
+					overlayDialogue({
+						'title': 'Error',
+						'content': jQuery('<span>').text('Unexpected response format from server'),
+						'buttons': [
+							{
+								'title': 'Ok',
+								'focused': true,
+								'action': function() {}
+							}
+						]
+					});
+				}
+			},
+			error: (xhr, status, error) => {
+				console.error('AJAX error:', xhr, status, error);
+				const errorMsg = xhr.responseText || error || 'Unknown error';
+				overlayDialogue({
+					'title': 'Error',
+					'content': jQuery('<span>').text('Failed to load items: ' + errorMsg),
+					'buttons': [
+						{
+							'title': 'Ok',
+							'focused': true,
+							'action': function() {}
+						}
+					]
+				});
+			}
+		});
+	}
+
+	/**
+	 * Display item selector dialog
+	 */
+	displayItemSelector(items) {
+		const content = jQuery('<div>').css({
+			'max-height': '400px',
+			'overflow-y': 'auto'
+		});
+		
+		const list = jQuery('<ul>').css({
+			'list-style': 'none',
+			'padding': '0',
+			'margin': '0'
+		});
+		
+		items.forEach(item => {
+			const li = jQuery('<li>').css({
+				'padding': '5px 10px',
+				'cursor': 'pointer',
+				'border-bottom': '1px solid #eee'
+			}).text(item.name);
+			
+			li.on('click', () => {
+				const pattern = this.itemNameToPattern(item.name);
+				if (this._item_pattern) {
+					this._item_pattern.value = pattern;
+					this._item_pattern.dispatchEvent(new Event('input', { bubbles: true }));
+					this._item_pattern.dispatchEvent(new Event('change', { bubbles: true }));
+				}
+				overlayDialogueDestroy('item-selector');
+			});
+			
+			li.hover(
+				function() { jQuery(this).css('background-color', '#f0f0f0'); },
+				function() { jQuery(this).css('background-color', 'transparent'); }
+			);
+			
+			list.append(li);
+		});
+		
+		content.append(list);
+		
+		overlayDialogue({
+			'title': 'Select Item Pattern',
+			'content': content,
+			'buttons': [
+				{
+					'title': 'Cancel',
+					'focused': true,
+					'action': function() {}
+				}
+			],
+			'dialogueid': 'item-selector'
+		});
+	}
+
+	/**
+	 * Convert item name to pattern
+	 */
+	itemNameToPattern(itemName) {
+		const form = document.getElementById('widget-dialogue-form') || 
+		             document.querySelector('form[name="widget_dialogue_form"]') ||
+		             this._item_pattern?.closest('form');
+		const pattern_mode = form?.querySelector('input[name="pattern_mode"]:checked')?.value || '0';
+		
+		// Replace {#MACROS} with wildcards or regex
+		if (pattern_mode === '1') {
+			// Regex mode: {#MACRO} -> .+
+			return itemName.replace(/\{#[^}]+\}/g, '.+');
+		} else {
+			// Wildcard mode: {#MACRO} -> *
+			return itemName.replace(/\{#[^}]+\}/g, '*');
 		}
 	}
 

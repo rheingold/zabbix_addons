@@ -58,9 +58,8 @@ window.widget_form = new class extends CWidgetForm {
 	 * @returns {void}
 	 */
 	init() {
-		console.log('Multigraph widget form init');
-		
 		this._form = this.getForm();                                   // Get form DOM element
+		
 		this._item_pattern = document.getElementById('item_pattern'); // Item pattern text field
 		this._pattern_mode = document.getElementById('pattern_mode'); // Pattern mode radio buttons
 		this._graph_type = document.getElementById('graph_type');     // Graph type radio buttons
@@ -73,23 +72,16 @@ window.widget_form = new class extends CWidgetForm {
 		                     document.querySelector('[name="graph_colors"]') ||
 		                     document.querySelector('input[id*="graph_colors"]');
 		
-		console.log('Found fields:', {
-			color_set: this._color_set,
-			graph_colors: this._graph_colors,
-			color_set_id: this._color_set?.id,
-			graph_colors_id: this._graph_colors?.id
-		});
-		
 		// Define color sets (must match PHP WidgetForm::COLOR_SETS)
 		this._color_sets = {
-			'default': '#1f77b4,#ff7f0e,#2ca02c,#d62728,#9467bd,#8c564b,#e377c2,#7f7f7f,#bcbd22,#17becf',
-			'pastel': '#aec7e8,#ffbb78,#98df8a,#ff9896,#c5b0d5,#c49c94,#f7b6d2,#c7c7c7,#dbdb8d,#9edae5',
-			'vibrant': '#e60049,#0bb4ff,#50e991,#e6d800,#9b19f5,#ffa300,#dc0ab4,#b3d4ff,#00bfa0',
-			'earth': '#8b4513,#daa520,#228b22,#4682b4,#d2691e,#708238,#cd853f,#556b2f,#b8860b',
-			'ocean': '#003f5c,#2f4b7c,#665191,#a05195,#d45087,#f95d6a,#ff7c43,#ffa600',
-			'sunset': '#ff6b6b,#ff8e53,#ffbe0b,#fb5607,#ff006e,#8338ec,#3a86ff',
-			'forest': '#1b4332,#2d6a4f,#40916c,#52b788,#74c69d,#95d5b2,#b7e4c7,#d8f3dc',
-			'monochrome': '#000000,#2d2d2d,#5a5a5a,#878787,#b4b4b4,#e1e1e1,#ffffff'
+			'default': '#1f77b4, #ff7f0e, #2ca02c, #d62728, #9467bd, #8c564b, #e377c2, #7f7f7f, #bcbd22, #17becf',
+			'pastel': '#aec7e8, #ffbb78, #98df8a, #ff9896, #c5b0d5, #c49c94, #f7b6d2, #c7c7c7, #dbdb8d, #9edae5',
+			'vibrant': '#e60049, #0bb4ff, #50e991, #e6d800, #9b19f5, #ffa300, #dc0ab4, #b3d4ff, #00bfa0',
+			'earth': '#8b4513, #daa520, #228b22, #4682b4, #d2691e, #708238, #cd853f, #556b2f, #b8860b',
+			'ocean': '#003f5c, #2f4b7c, #665191, #a05195, #d45087, #f95d6a, #ff7c43, #ffa600',
+			'sunset': '#ff6b6b, #ff8e53, #ffbe0b, #fb5607, #ff006e, #8338ec, #3a86ff',
+			'forest': '#1b4332, #2d6a4f, #40916c, #52b788, #74c69d, #95d5b2, #b7e4c7, #d8f3dc',
+			'monochrome': '#000000, #2d2d2d, #5a5a5a, #878787, #b4b4b4, #e1e1e1, #ffffff'
 		};
 		
 		const barSeparationField = document.getElementById('bar_separation');
@@ -111,17 +103,11 @@ window.widget_form = new class extends CWidgetForm {
 			console.log('Color set handler installed, color_set:', this._color_set, 'graph_colors:', this._graph_colors);
 			this._color_set.addEventListener('change', () => {
 				const selectedSet = this._color_set.value;
-				console.log('Color set changed to:', selectedSet);
 				if (selectedSet && this._color_sets[selectedSet]) {
-					console.log('Setting graph_colors to:', this._color_sets[selectedSet]);
 					this._graph_colors.value = this._color_sets[selectedSet];
-					// Trigger change event to notify Zabbix form of the update
 					this._graph_colors.dispatchEvent(new Event('change', { bubbles: true }));
-					console.log('graph_colors field value after update:', this._graph_colors.value);
 				}
 			});
-		} else {
-			console.log('Color set handler NOT installed - color_set:', this._color_set, 'graph_colors:', this._graph_colors);
 		}
 		
 		// Setup graph type change handler for conditional field visibility
@@ -159,18 +145,49 @@ window.widget_form = new class extends CWidgetForm {
 	 * Add pattern builder button
 	 * 
 	 * PURPOSE:
-	 * Placeholder for pattern builder UI.
-	 * Currently disabled - users manually enter patterns.
+	 * Adds a button next to the item_pattern field to open pattern builder dialog.
 	 * 
-	 * FUTURE ENHANCEMENT:
-	 * Could add button to open item selector dialog for pattern building.
+	 * ALGORITHM:
+	 * 1. Find item_pattern field
+	 * 2. Create button element
+	 * 3. Insert button after field
+	 * 4. Bind click event to openItemSelector()
 	 * 
 	 * @returns {void}
 	 */
 	addPatternBuilderButton() {
-		// Pattern builder disabled - use text field for pattern matching
-		// User can manually enter patterns like "CPU*" or "Memory.*"
-		return;
+		console.log('addPatternBuilderButton called, item_pattern:', this._item_pattern);
+		
+		if (!this._item_pattern) {
+			console.error('item_pattern field not found, cannot add pattern builder button');
+			return;
+		}
+
+		// Create button
+		const button = document.createElement('button');
+		button.type = 'button';
+		button.className = 'btn-alt';
+		button.textContent = 'Pattern Builder';
+		button.style.marginLeft = '5px';
+		button.id = 'pattern_builder_btn';
+		
+		console.log('Button created:', button);
+		
+		// Insert button after item_pattern field
+		if (this._item_pattern.parentNode) {
+			this._item_pattern.parentNode.insertBefore(button, this._item_pattern.nextSibling);
+			console.log('Button inserted into DOM');
+		} else {
+			console.error('item_pattern has no parent node');
+		}
+		
+		// Bind click event
+		button.addEventListener('click', () => {
+			console.log('Pattern builder button clicked');
+			this.openItemSelector();
+		});
+		
+		console.log('Pattern builder button setup complete');
 	}
 
 	/**

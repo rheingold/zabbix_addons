@@ -21,6 +21,9 @@
     },
     "widget.multigraphwidget.rescan": {
       "class": "ModuleRescan"
+    },
+    "widget.multigraphwidget.itemlist": {
+      "class": "ItemList"
     }
   },
   "assets": {
