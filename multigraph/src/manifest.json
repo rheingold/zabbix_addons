@@ -4,8 +4,8 @@
   "id": "multigraphwidget",
   "name": "Multigraph",
   "namespace": "Multigraph",
-  "version": "0.1.7",
-  "author": "Lukas Plachy",
+  "version": "0.1.8-draft",
+  "author": "lukas@plachy.eu",
   "description": "Enhanced multi-graph visualization with regex item matching",
   "url": "https://github.com/rheingold/zabbix_addons",
   "widget": {

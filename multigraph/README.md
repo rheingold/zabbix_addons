@@ -6,7 +6,7 @@
 ║                       MULTIGRAPH WIDGET                                    ║
 ║                  Enhanced Zabbix Graph Visualization                      ║
 ║                                                                           ║
-║  Version:          0.1.7 (Development - Pattern Builder Added)           ║
+║  Version:          0.1.8-draft (Template Dashboard Support Complete)     ║
 ║  Created:          November 5, 2025                                       ║
 ║  Last Updated:     November 14, 2025                                      ║
 ║                                                                           ║
@@ -21,10 +21,10 @@
 
 **⚠️ IMPORTANT NOTICE**
 
-**This version (0.1.0) is:**
+**This version (0.1.8-draft) is:**
 - ✅ Tested and working with **Zabbix Dashboard (New UI)**
 - ❌ **NOT tested** with **Classic Zabbix Frontend**
-- ⚠️ **Preliminary release** - systematic testing framework not yet implemented
+- ⚠️ **Draft release** - template dashboard support completed but needs wider testing
 - 🔧 Under active development
 
 **Production Use:** Not recommended until v1.0.0 with full test coverage.
@@ -495,6 +495,15 @@ Dashboard Load → WidgetView → MatchedItemsData → API::Item
 - [ ] E.1.4. Release notes and changelog
 
 ### Version History
+
+**v0.1.8-draft (2025-11-14) - Template Dashboard Support (DRAFT RELEASE)**
+- ✅ Pattern builder now works on template dashboards
+- ✅ Detects template context from URL action parameter
+- ✅ Extracts templateid from breadcrumb links
+- ✅ Proper dialog closing and widget reactivation
+- ✅ Z-index management for dialog layering
+- ✅ Cleaned production code (removed debug logging)
+- ⚠️ **Draft status:** Needs broader testing before stable release
 
 **v0.1.7 (2025-11-14) - Pattern Builder UI**
 - Added interactive Pattern Builder button next to item_pattern field
