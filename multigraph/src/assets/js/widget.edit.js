@@ -64,6 +64,20 @@ window.widget_form = new class extends CWidgetForm {
 		this._item_pattern = document.getElementById('item_pattern'); // Item pattern text field
 		this._pattern_mode = document.getElementById('pattern_mode'); // Pattern mode radio buttons
 		this._graph_type = document.getElementById('graph_type');     // Graph type radio buttons
+		this._color_set = document.getElementById('color_set');       // Color set dropdown
+		this._graph_colors = document.getElementById('graph_colors'); // Graph colors text field
+		
+		// Define color sets (must match PHP WidgetForm::COLOR_SETS)
+		this._color_sets = {
+			'default': '#1f77b4,#ff7f0e,#2ca02c,#d62728,#9467bd,#8c564b,#e377c2,#7f7f7f,#bcbd22,#17becf',
+			'pastel': '#aec7e8,#ffbb78,#98df8a,#ff9896,#c5b0d5,#c49c94,#f7b6d2,#c7c7c7,#dbdb8d,#9edae5',
+			'vibrant': '#e60049,#0bb4ff,#50e991,#e6d800,#9b19f5,#ffa300,#dc0ab4,#b3d4ff,#00bfa0',
+			'earth': '#8b4513,#daa520,#228b22,#4682b4,#d2691e,#708238,#cd853f,#556b2f,#b8860b',
+			'ocean': '#003f5c,#2f4b7c,#665191,#a05195,#d45087,#f95d6a,#ff7c43,#ffa600',
+			'sunset': '#ff6b6b,#ff8e53,#ffbe0b,#fb5607,#ff006e,#8338ec,#3a86ff',
+			'forest': '#1b4332,#2d6a4f,#40916c,#52b788,#74c69d,#95d5b2,#b7e4c7,#d8f3dc',
+			'monochrome': '#000000,#2d2d2d,#5a5a5a,#878787,#b4b4b4,#e1e1e1,#ffffff'
+		};
 		
 		const barSeparationField = document.getElementById('bar_separation');
 		this._bar_separation_row = barSeparationField ? barSeparationField.closest('.form-field') : null;
@@ -78,6 +92,16 @@ window.widget_form = new class extends CWidgetForm {
 		
 		// Add pattern builder button (currently disabled)
 		this.addPatternBuilderButton();
+		
+		// Setup color set selector handler
+		if (this._color_set && this._graph_colors) {
+			this._color_set.addEventListener('change', () => {
+				const selectedSet = this._color_set.value;
+				if (selectedSet && this._color_sets[selectedSet]) {
+					this._graph_colors.value = this._color_sets[selectedSet];
+				}
+			});
+		}
 		
 		// Setup graph type change handler for conditional field visibility
 		if (this._graph_type && (this._bar_separation_row || this._bar_display_mode_row || this._distribution_bins_row)) {

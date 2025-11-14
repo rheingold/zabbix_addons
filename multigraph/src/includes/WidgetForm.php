@@ -326,15 +326,15 @@ class WidgetForm extends CWidgetForm {
 			)
 			->addField(
 				(new CWidgetFieldTextBox('text_color_legend', _('Legend text color')))
-					->setDefault('#000000')
+					->setDefault('#909090')
 			)
 			->addField(
 				(new CWidgetFieldTextBox('text_color_xaxis', _('X-axis text color')))
-					->setDefault('#000000')
+					->setDefault('#909090')
 			)
 			->addField(
 				(new CWidgetFieldTextBox('text_color_yaxis', _('Y-axis text color')))
-					->setDefault('#000000')
+					->setDefault('#909090')
 			);
 	}
 }

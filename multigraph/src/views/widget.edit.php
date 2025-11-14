@@ -88,6 +88,10 @@ if (isset($data['fields']['legend_position'])) {
 }
 
 // === OPTIONAL FIELDS: Color Configuration ===
+if (isset($data['fields']['color_set'])) {
+	$form->addField(new CWidgetFieldSelectView($data['fields']['color_set']));
+}
+
 if (isset($data['fields']['graph_colors'])) {
 	$form->addField(new CWidgetFieldTextBoxView($data['fields']['graph_colors']));
 }
