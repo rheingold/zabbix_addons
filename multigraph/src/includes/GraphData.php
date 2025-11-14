@@ -153,7 +153,7 @@ class GraphData {
 		
 		// Check if color_set is specified and override graph_colors if it is
 		$color_source = $config['graph_colors'] ?? '';
-		if (!empty($config['color_set']) && $config['color_set'] !== 'default') {
+		if (!empty($config['color_set']) && $config['color_set'] !== 0) {
 			// Look up the color set from WidgetForm constants
 			$color_sets = \Widgets\Multigraph\Includes\WidgetForm::COLOR_SETS;
 			if (isset($color_sets[$config['color_set']])) {

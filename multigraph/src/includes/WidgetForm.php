@@ -91,20 +91,33 @@ class WidgetForm extends CWidgetForm {
 	public const COLOR_MODE_OFFSET = 2;
 
 	/**
+	 * Color set constants for dropdown selection
+	 * @const int Color set identifiers
+	 */
+	public const COLOR_SET_DEFAULT = 0;
+	public const COLOR_SET_PASTEL = 1;
+	public const COLOR_SET_VIBRANT = 2;
+	public const COLOR_SET_EARTH = 3;
+	public const COLOR_SET_OCEAN = 4;
+	public const COLOR_SET_SUNSET = 5;
+	public const COLOR_SET_FOREST = 6;
+	public const COLOR_SET_MONOCHROME = 7;
+
+	/**
 	 * Named color sets for quick selection
 	 * Format: 'SetName:#RRGGBB,#RRGGBB,...'
 	 * Name before colon is displayed in UI but ignored during rendering
-	 * @const array Predefined color schemes
+	 * @const array Predefined color schemes with integer keys
 	 */
 	public const COLOR_SETS = [
-		'default' => 'Default:#1f77b4,#ff7f0e,#2ca02c,#d62728,#9467bd,#8c564b,#e377c2,#7f7f7f,#bcbd22,#17becf',
-		'pastel' => 'Pastel:#aec7e8,#ffbb78,#98df8a,#ff9896,#c5b0d5,#c49c94,#f7b6d2,#c7c7c7,#dbdb8d,#9edae5',
-		'vibrant' => 'Vibrant:#e60049,#0bb4ff,#50e991,#e6d800,#9b19f5,#ffa300,#dc0ab4,#b3d4ff,#00bfa0',
-		'earth' => 'Earth:#8b4513,#daa520,#228b22,#4682b4,#d2691e,#708238,#cd853f,#556b2f,#b8860b',
-		'ocean' => 'Ocean:#003f5c,#2f4b7c,#665191,#a05195,#d45087,#f95d6a,#ff7c43,#ffa600',
-		'sunset' => 'Sunset:#ff6b6b,#ff8e53,#ffbe0b,#fb5607,#ff006e,#8338ec,#3a86ff',
-		'forest' => 'Forest:#1b4332,#2d6a4f,#40916c,#52b788,#74c69d,#95d5b2,#b7e4c7,#d8f3dc',
-		'monochrome' => 'Monochrome:#000000,#2d2d2d,#5a5a5a,#878787,#b4b4b4,#e1e1e1,#ffffff'
+		self::COLOR_SET_DEFAULT => 'Default:#1f77b4,#ff7f0e,#2ca02c,#d62728,#9467bd,#8c564b,#e377c2,#7f7f7f,#bcbd22,#17becf',
+		self::COLOR_SET_PASTEL => 'Pastel:#aec7e8,#ffbb78,#98df8a,#ff9896,#c5b0d5,#c49c94,#f7b6d2,#c7c7c7,#dbdb8d,#9edae5',
+		self::COLOR_SET_VIBRANT => 'Vibrant:#e60049,#0bb4ff,#50e991,#e6d800,#9b19f5,#ffa300,#dc0ab4,#b3d4ff,#00bfa0',
+		self::COLOR_SET_EARTH => 'Earth:#8b4513,#daa520,#228b22,#4682b4,#d2691e,#708238,#cd853f,#556b2f,#b8860b',
+		self::COLOR_SET_OCEAN => 'Ocean:#003f5c,#2f4b7c,#665191,#a05195,#d45087,#f95d6a,#ff7c43,#ffa600',
+		self::COLOR_SET_SUNSET => 'Sunset:#ff6b6b,#ff8e53,#ffbe0b,#fb5607,#ff006e,#8338ec,#3a86ff',
+		self::COLOR_SET_FOREST => 'Forest:#1b4332,#2d6a4f,#40916c,#52b788,#74c69d,#95d5b2,#b7e4c7,#d8f3dc',
+		self::COLOR_SET_MONOCHROME => 'Monochrome:#000000,#2d2d2d,#5a5a5a,#878787,#b4b4b4,#e1e1e1,#ffffff'
 	];
 
 	/**
@@ -287,11 +300,10 @@ class WidgetForm extends CWidgetForm {
 					->setDefault('#1f77b4,#ff7f0e,#2ca02c,#d62728,#9467bd')
 			)
 			->addField(
-				(new CWidgetFieldSelect('color_set', _('Color set'), array_combine(
-					array_keys(self::COLOR_SETS),
+				(new CWidgetFieldSelect('color_set', _('Color set'), 
 					array_map(function($v) { return explode(':', $v)[0]; }, self::COLOR_SETS)
-				)))
-					->setDefault('default')
+				))
+					->setDefault(self::COLOR_SET_DEFAULT)
 			)
 			->addField(
 				(new CWidgetFieldRadioButtonList('color_mode', _('Color mode'), [

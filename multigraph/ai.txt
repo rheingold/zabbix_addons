@@ -1,6 +1,6 @@
 === AI CONTEXT - MULTIGRAPH WIDGET (GENERIC) ===
-Updated: November 10, 2025
-Version: 0.1.1
+Updated: November 14, 2025
+Version: 0.1.6
 
 ⚠️ SYNC ai.txt + ai_priv.txt | Update BOTH with: deployment/build/debug changes
 This file = generic context (Git-tracked). ai_priv.txt = local paths/credentials (git-ignored).
@@ -342,52 +342,40 @@ PERFORMANCE ISSUES:
   - Check browser performance: F12 → Performance tab
 
 ================================================================================
-CURRENT STATUS (November 10, 2025)
+CURRENT STATUS (November 14, 2025)
 ================================================================================
 
-PHASE: B.7 - Documentation (COMPLETED)
+VERSION: 0.1.6 (Development)
+PHASE: Active Feature Development
 
-COMPLETED:
-  ✅ Phase A: Planning and architecture
-  ✅ Phase B.1: Widget foundation (manifest, MVC structure)
-  ✅ Phase B.2: Graph rendering (Canvas, data fetching)
-  ✅ Phase B.3: Item pattern matching (wildcard, regex)
-  ✅ Phase B.4: Interactivity (hover, resize)
-  ✅ Phase B.5: Configuration (colors, legend, Y-axis, grid)
-  ✅ Phase B.6: Dashboard integration (timeframe parsing, auto-refresh)
-  ✅ Phase B.7: Documentation (code docs, README.md, USAGE.md)
+COMPLETED FEATURES (v0.1.6):
+  ✅ Core graph rendering (line, area, bar, distribution/histogram)
+  ✅ Pattern-based item selection (wildcard, regex)
+  ✅ Dashboard integration (timeframe, auto-refresh)
+  ✅ Interactivity (hover tooltips, resize)
+  ✅ Fill rendering for line charts with missing data handling
+  ✅ Distribution histogram with per-series counts
+  ✅ Bar display modes (stacked/grouped)
+  ✅ Named color sets with dropdown selector (8 predefined palettes)
+  ✅ Default label colors changed to #909090
+
+ACTIVE TODO:
+  📋 Interactive pattern builder UI (Next task)
+     - Modal popup for item prototype selection
+     - Show {#MACROS}, click to select
+     - Auto-convert {#DISK} to .* pattern
+     - AJAX call to fetch item prototypes
 
 PENDING:
-  📋 Phase C: Testing and Quality
-     - C.1: Unit tests (PHPUnit, Jest)
-     - C.2: Integration tests
-     - C.3: Browser compatibility tests
-     - C.4: Classic UI testing
-     - C.5: Performance testing
-  📋 Phase D: Enhancement
-     - D.1: Export graph (PNG/SVG)
-     - D.2: Usability improvements (pattern builder UI)
-     - D.3: Additional chart types (bar, scatter, heatmap)
-  📋 Phase E: Release 1.0.0
-     - E.1: All testing complete
-     - E.2: Documentation complete
-     - E.3: Deployment automation
-     - E.4: Release notes
+  📋 Testing and Quality (Phase C)
+  📋 Export functionality (PNG/SVG)
+  📋 Performance optimization for large datasets
+  📋 Classic UI compatibility testing
 
 KNOWN ISSUES:
-  - Classic UI compatibility: UNTESTED (may not work)
-  - Large dataset performance: NOT OPTIMIZED (> 1000 points per series)
-  - No automated testing: Manual testing only
-  - Item limit not configurable: Hardcoded to 100 in MatchedItemsData.php
-
-VERSION HISTORY:
-  v0.1.0 (2025-11-10) - Current development version
-    - Core functionality complete
-    - Documentation complete
-    - Testing framework not yet implemented
-    - Status: Functional but untested for production
-
-NEXT MILESTONE: Phase C - Testing and Quality
+  - Classic UI compatibility: UNTESTED
+  - Large dataset performance: NOT OPTIMIZED (> 1000 points)
+  - Item limit hardcoded to 100 in MatchedItemsData.php
 
 ================================================================================
 HELPERS AND TOOLS
@@ -511,60 +499,35 @@ CURRENT TODO LIST
 ================================================================================
 Last Updated: November 14, 2025
 
-PRIORITY 1 - ACTIVE (v0.1.6):
-[ ] 1. Update default label color to #909090
-    - Change default text color for axis labels, grid labels, and legend
-    - Currently #000 (black), should be #909090 (medium gray)
-    - Better visual integration with Zabbix theme
-
-PRIORITY 2 - FEATURES:
-[ ] 2. Improve X-axis time labels
-    - Better reflect selected from-to interval length
-    - Enhance adaptive time formatting
-    - Show appropriate granularity based on time range (hours, days, weeks, months)
-
-[ ] 3. Add interactive pattern builder UI
+ACTIVE TASK:
+[ ] Interactive pattern builder UI
     - Modal popup for item prototype selection
-    - Show {#MACROS}, click to select
+    - Show {#MACROS} from selected hosts, click to select
     - Auto-convert {#DISK} to .* pattern
-    - AJAX call to fetch item prototypes from selected hosts
+    - AJAX call to fetch item prototypes
 
-[ ] 4. Implement named color sets
-    - Pre-set color schemes: 'SetName:#RRGGBB,#RRGGBB,...'
-    - Name before ':' ignored during rendering
-    - Configurable in manifest or PHP constant
-    - Add dropdown in widget form
+BACKLOG:
+[ ] Improve X-axis time labels adaptive formatting
+[ ] Export graph functionality (PNG/SVG)
+[ ] Performance optimization for >1000 points per series
+[ ] Automated testing framework
+[ ] Classic UI compatibility
 
-COMPLETED (v0.1.6):
+COMPLETED (v0.1.6 - November 14, 2025):
+[✓] Named color sets with dropdown selector
+    - 8 predefined palettes (Default, Pastel, Vibrant, Earth, Ocean, Sunset, Forest, Monochrome)
+    - Integer keys (0-7) for Zabbix field compatibility
+    - JavaScript handler in widget.edit.js.php constructor
+    - Backend color extraction in GraphData.php
+[✓] Default label colors changed to #909090
+    - Changed from #000 to #909090 for better Zabbix theme integration
+    - Applied to X-axis, Y-axis, and legend text
 [✓] Distribution histogram per-series counts (Nov 14)
-    - Each bin tracks seriesCounts[] array with counts per series
-    - Shows actual distribution of values per series
-[✓] Bar display mode for distribution graphs (Nov 14)
-    - Mode 1 (stacked) = stacked colored segments in each bin
-    - Mode 0 (grouped) = side-by-side bars per series within each bin
+[✓] Bar display modes: stacked/grouped (Nov 14)
 [✓] Fill rendering for line charts (Nov 14)
-    - Restored fill rendering for graph_type === 0
-    - Respects missing_data: 0 (None) = segments at gaps, 1/2 (Connected/Treat as 0) = continuous
 [✓] Bar chart graph type (Nov 13)
-    - Dropdown in widget form, bar rendering in class.widget.js
-    - Grouped (side-by-side) and stacked modes with bar_separation
 [✓] Missing data handling options (Nov 13)
-    - Three modes: None (gaps), Connected (line through), Treat as 0 (zero interpolation)
 [✓] Distribution/histogram graph type (Nov 13)
-    - Y-axis shows count of values in intervals
-    - Configurable number of bins
-[✓] Template dashboard save (v0.1.5)
-    - Widget saves without item pattern, shows "Please configure" message
-[✓] Item pattern with % character (v0.1.5)
-    - preg_quote() handles % correctly
-[✓] Fix 500 error - widget won't load (v0.1.5)
-    - Removed hasInput() call from WidgetForm
-[✓] Fix widget width (v0.1.4)
-    - Reduced from 48 to 36 units
-[✓] Hover tooltip functionality (v0.1.2)
-[✓] Highlight circles on hover (v0.1.2)
-[✓] Canvas overlay rendering bug (v0.1.2)
-[✓] Scrollbar issue (v0.1.2)
 
 ================================================================================
 FOR AI ASSISTANTS

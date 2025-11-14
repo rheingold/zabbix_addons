@@ -72,11 +72,10 @@ class WidgetEdit extends CControllerDashboardWidgetEdit {
 		
 		// Manually create color_set field if it doesn't exist or is null
 		if (!isset($fields['color_set']) || $fields['color_set'] === null) {
-			$color_set_field = new CWidgetFieldSelect('color_set', _('Color set'), array_combine(
-				array_keys(WidgetForm::COLOR_SETS),
+			$color_set_field = new CWidgetFieldSelect('color_set', _('Color set'), 
 				array_map(function($v) { return explode(':', $v)[0]; }, WidgetForm::COLOR_SETS)
-			));
-			$color_set_field->setValue($this->widget->fields_values['color_set'] ?? 'default');
+			);
+			$color_set_field->setValue($this->widget->fields_values['color_set'] ?? WidgetForm::COLOR_SET_DEFAULT);
 			$fields['color_set'] = $color_set_field;
 		}
 		
