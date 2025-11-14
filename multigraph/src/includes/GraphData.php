@@ -150,7 +150,20 @@ class GraphData {
 	 */
 	public static function prepareGraphData(array $items, array $history_data, array $config): array {
 		$series = [];
-		$colors = self::parseColors($config['graph_colors'] ?? '');
+		
+		// Check if color_set is specified and override graph_colors if it is
+		$color_source = $config['graph_colors'] ?? '';
+		if (!empty($config['color_set']) && $config['color_set'] !== 'default') {
+			// Look up the color set from WidgetForm constants
+			$color_sets = \Widgets\Multigraph\Includes\WidgetForm::COLOR_SETS;
+			if (isset($color_sets[$config['color_set']])) {
+				// Extract colors after the colon (ignore the name part)
+				$parts = explode(':', $color_sets[$config['color_set']], 2);
+				$color_source = $parts[1] ?? $color_source;
+			}
+		}
+		
+		$colors = self::parseColors($color_source);
 		$color_mode = $config['color_mode'] ?? self::COLOR_MODE_CYCLE;
 		$color_index = 0;
 

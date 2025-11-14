@@ -45,6 +45,7 @@ use Zabbix\Widgets\Fields\{ // Zabbix widget field types
 	CWidgetFieldIntegerBox,        // Integer input with min/max validation
 	CWidgetFieldMultiSelectHost,   // Host picker with multi-selection
 	CWidgetFieldRadioButtonList,   // Radio button group selection
+	CWidgetFieldSelect,             // Dropdown select field
 	CWidgetFieldTextBox,            // Single-line text input
 	CWidgetFieldTimePeriod          // Time period picker
 };
@@ -88,6 +89,23 @@ class WidgetForm extends CWidgetForm {
 	 * @const int Used in color_mode RadioButtonList
 	 */
 	public const COLOR_MODE_OFFSET = 2;
+
+	/**
+	 * Named color sets for quick selection
+	 * Format: 'SetName:#RRGGBB,#RRGGBB,...'
+	 * Name before colon is displayed in UI but ignored during rendering
+	 * @const array Predefined color schemes
+	 */
+	public const COLOR_SETS = [
+		'default' => 'Default:#1f77b4,#ff7f0e,#2ca02c,#d62728,#9467bd,#8c564b,#e377c2,#7f7f7f,#bcbd22,#17becf',
+		'pastel' => 'Pastel:#aec7e8,#ffbb78,#98df8a,#ff9896,#c5b0d5,#c49c94,#f7b6d2,#c7c7c7,#dbdb8d,#9edae5',
+		'vibrant' => 'Vibrant:#e60049,#0bb4ff,#50e991,#e6d800,#9b19f5,#ffa300,#dc0ab4,#b3d4ff,#00bfa0',
+		'earth' => 'Earth:#8b4513,#daa520,#228b22,#4682b4,#d2691e,#708238,#cd853f,#556b2f,#b8860b',
+		'ocean' => 'Ocean:#003f5c,#2f4b7c,#665191,#a05195,#d45087,#f95d6a,#ff7c43,#ffa600',
+		'sunset' => 'Sunset:#ff6b6b,#ff8e53,#ffbe0b,#fb5607,#ff006e,#8338ec,#3a86ff',
+		'forest' => 'Forest:#1b4332,#2d6a4f,#40916c,#52b788,#74c69d,#95d5b2,#b7e4c7,#d8f3dc',
+		'monochrome' => 'Monochrome:#000000,#2d2d2d,#5a5a5a,#878787,#b4b4b4,#e1e1e1,#ffffff'
+	];
 
 	/**
 	 * Missing data: Leave gaps (don't draw line)
@@ -267,6 +285,13 @@ class WidgetForm extends CWidgetForm {
 			->addField(
 				(new CWidgetFieldTextBox('graph_colors', _('Graph colors')))
 					->setDefault('#1f77b4,#ff7f0e,#2ca02c,#d62728,#9467bd')
+			)
+			->addField(
+				(new CWidgetFieldSelect('color_set', _('Color set'), array_combine(
+					array_keys(self::COLOR_SETS),
+					array_map(function($v) { return explode(':', $v)[0]; }, self::COLOR_SETS)
+				)))
+					->setDefault('default')
 			)
 			->addField(
 				(new CWidgetFieldRadioButtonList('color_mode', _('Color mode'), [
