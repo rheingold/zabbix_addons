@@ -631,16 +631,134 @@ class CWidgetMultigraph extends CWidget {
         }
 
         // === PHASE 10: Draw Stacked Area Fills ===
-        console.log('DEBUG: Before fill rendering');
         const fill_opacity = parseFloat(data.fill_opacity) || 0;
-        console.log('DEBUG: fill_opacity =', fill_opacity);
 
-        // Skip fill rendering for bar charts and distribution graphs
-        console.log('DEBUG: Checking fill condition: graph_type !== 1 =', graph_type !== 1, 'graph_type !== 2 =', graph_type !== 2, 'fill_opacity > 0 =', fill_opacity > 0);
-        
-        // FILL RENDERING TEMPORARILY DISABLED FOR DEBUGGING
-        console.log('DEBUG: Skipped fill rendering block');
-        console.log('DEBUG: Immediately after closing brace of fill if block');
+        // Skip fill rendering for bar charts and distribution graphs - fills only for line graphs
+        if (graph_type === 0 && fill_opacity > 0) {
+            // Sort series by maximum value (descending) for stacking order
+            // Highest values on top, lowest at bottom
+            // Avoid spread operator for large arrays
+            const sortedSeries = data.series.slice().sort((a, b) => {
+                let maxA = 0;
+                if (a.processedData && a.processedData.length > 0) {
+                    maxA = a.processedData[0].drawValue;
+                    for (let i = 1; i < a.processedData.length; i++) {
+                        if (a.processedData[i].drawValue > maxA) maxA = a.processedData[i].drawValue;
+                    }
+                }
+                let maxB = 0;
+                if (b.processedData && b.processedData.length > 0) {
+                    maxB = b.processedData[0].drawValue;
+                    for (let i = 1; i < b.processedData.length; i++) {
+                        if (b.processedData[i].drawValue > maxB) maxB = b.processedData[i].drawValue;
+                    }
+                }
+                return maxB - maxA; // Descending order
+            });
+
+            // Draw fills from bottom to top (reverse iteration)
+            // Each series fills the area between itself and the series below
+            for (let seriesIdx = sortedSeries.length - 1; seriesIdx >= 0; seriesIdx--) {
+                const series = sortedSeries[seriesIdx];
+                if (!series.processedData || series.processedData.length === 0) continue;
+
+                // Convert hex color to RGBA with user-specified opacity
+                const hexColor = series.color;
+                const r = parseInt(hexColor.slice(1, 3), 16);
+                const g = parseInt(hexColor.slice(3, 5), 16);
+                const b = parseInt(hexColor.slice(5, 7), 16);
+                
+                ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${fill_opacity})`;
+
+                // Find the next series below for stacking, or use X-axis baseline
+                const nextSeriesBelow = seriesIdx < sortedSeries.length - 1 ? sortedSeries[seriesIdx + 1] : null;
+
+                if (missing_data === 0) {
+                    // None mode: Draw separate fill segments at gaps
+                    let segmentStart = 0;
+                    for (let i = 1; i <= series.processedData.length; i++) {
+                        const isGap = i < series.processedData.length && series.processedData[i].hasGapBefore;
+                        const isEnd = i === series.processedData.length;
+                        
+                        if (isGap || isEnd) {
+                            // Draw segment from segmentStart to i-1
+                            const segment = series.processedData.slice(segmentStart, i);
+                            if (segment.length > 0) {
+                                ctx.beginPath();
+                                
+                                const firstX = marginLeft + ((segment[0].timestamp - minTime) / timeRange) * graphWidth;
+                                if (nextSeriesBelow && nextSeriesBelow.processedData && nextSeriesBelow.processedData.length > 0) {
+                                    const belowValue = this._getValueAtTime(nextSeriesBelow.data, segment[0].timestamp);
+                                    const belowY = marginTop + graphHeight - ((belowValue - minValue) / valueRange) * graphHeight;
+                                    ctx.moveTo(firstX, belowY);
+                                } else {
+                                    ctx.moveTo(firstX, marginTop + graphHeight);
+                                }
+                                
+                                segment.forEach(point => {
+                                    const x = marginLeft + ((point.timestamp - minTime) / timeRange) * graphWidth;
+                                    const y = marginTop + graphHeight - ((point.drawValue - minValue) / valueRange) * graphHeight;
+                                    ctx.lineTo(x, y);
+                                });
+                                
+                                if (nextSeriesBelow && nextSeriesBelow.processedData && nextSeriesBelow.processedData.length > 0) {
+                                    for (let j = segment.length - 1; j >= 0; j--) {
+                                        const belowValue = this._getValueAtTime(nextSeriesBelow.data, segment[j].timestamp);
+                                        const x = marginLeft + ((segment[j].timestamp - minTime) / timeRange) * graphWidth;
+                                        const y = marginTop + graphHeight - ((belowValue - minValue) / valueRange) * graphHeight;
+                                        ctx.lineTo(x, y);
+                                    }
+                                } else {
+                                    const lastX = marginLeft + ((segment[segment.length-1].timestamp - minTime) / timeRange) * graphWidth;
+                                    ctx.lineTo(lastX, marginTop + graphHeight);
+                                }
+                                
+                                ctx.closePath();
+                                ctx.fill();
+                            }
+                            segmentStart = i;
+                        }
+                    }
+                } else {
+                    // Connected or Treat as 0: Draw continuous fill using processed data
+                    ctx.beginPath();
+                    
+                    const firstTimestamp = series.processedData[0].timestamp;
+                    const firstX = marginLeft + ((firstTimestamp - minTime) / timeRange) * graphWidth;
+
+                    if (nextSeriesBelow && nextSeriesBelow.processedData && nextSeriesBelow.processedData.length > 0) {
+                        const belowValue = this._getValueAtTime(nextSeriesBelow.data, firstTimestamp);
+                        const belowY = marginTop + graphHeight - ((belowValue - minValue) / valueRange) * graphHeight;
+                        ctx.moveTo(firstX, belowY);
+                    } else {
+                        ctx.moveTo(firstX, marginTop + graphHeight);
+                    }
+
+                    series.processedData.forEach(point => {
+                        const x = marginLeft + ((point.timestamp - minTime) / timeRange) * graphWidth;
+                        const y = marginTop + graphHeight - ((point.drawValue - minValue) / valueRange) * graphHeight;
+                        ctx.lineTo(x, y);
+                    });
+
+                    if (nextSeriesBelow && nextSeriesBelow.processedData && nextSeriesBelow.processedData.length > 0) {
+                        for (let i = series.processedData.length - 1; i >= 0; i--) {
+                            const timestamp = series.processedData[i].timestamp;
+                            const belowValue = this._getValueAtTime(nextSeriesBelow.data, timestamp);
+                            const x = marginLeft + ((timestamp - minTime) / timeRange) * graphWidth;
+                            const y = marginTop + graphHeight - ((belowValue - minValue) / valueRange) * graphHeight;
+                            ctx.lineTo(x, y);
+                        }
+                    } else {
+                        const lastTimestamp = series.processedData[series.processedData.length - 1].timestamp;
+                        const lastX = marginLeft + ((lastTimestamp - minTime) / timeRange) * graphWidth;
+                        ctx.lineTo(lastX, marginTop + graphHeight);
+                    }
+
+                    ctx.closePath();
+                    ctx.fill();
+                }
+            }
+        } // End fill rendering for line graphs
         
         console.log('DEBUG: After fill rendering block, about to start PHASE 11');
 
