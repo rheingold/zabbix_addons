@@ -138,34 +138,21 @@ window.widget_form = new class extends CWidgetForm {
 	 * Open item selector dialog
 	 */
 	openItemSelector() {
-		console.log('=== Pattern Builder v2 - Dialog Close Fix ===');
-		
 		const form = document.getElementById('widget-dialogue-form') || 
 		             document.querySelector('form[name="widget_dialogue_form"]') ||
 		             this._item_pattern?.closest('form');
 		
-		console.log('Form:', form);
-		console.log('URL:', window.location.href);
-		
-		// Check if we're on a template dashboard (URL contains templateid)
+		// Check if we're on a template dashboard
 		const urlParams = new URLSearchParams(window.location.search);
-		console.log('URL params:', Array.from(urlParams.entries()));
-		
 		const templateid = urlParams.get('templateid');
 		const action = urlParams.get('action');
 		
-		console.log('Action:', action, 'TemplateID:', templateid);
-		
-		// If action contains "template", we might be on a template dashboard
-		// Try to get templateid from various sources
+		// If action contains "template", we're on a template dashboard
 		if (action && action.includes('template')) {
-			console.log('Template dashboard detected from action');
-			
 			// Try to get templateid from dashboard page context
 			const dashboardElement = document.querySelector('[data-templateid]');
 			if (dashboardElement) {
 				const tid = dashboardElement.getAttribute('data-templateid');
-				console.log('Found templateid in dashboard element:', tid);
 				if (tid) {
 					this.showItemList(tid, true);
 					return;
@@ -174,22 +161,19 @@ window.widget_form = new class extends CWidgetForm {
 			
 			// Try to find it in the page's JS context
 			if (window.templateid) {
-				console.log('Found templateid in window:', window.templateid);
 				this.showItemList(window.templateid, true);
 				return;
 			}
 			
-			// Last resort: Get dashboardid and fetch template via API
+			// Last resort: Get dashboardid and fetch template from breadcrumb
 			const dashboardid = urlParams.get('dashboardid');
 			if (dashboardid) {
-				console.log('Fetching template for dashboardid:', dashboardid);
 				this.fetchTemplateFromDashboard(dashboardid);
 				return;
 			}
 		}
 		
 		if (templateid) {
-			console.log('Template dashboard detected, templateid:', templateid);
 			this.showItemList(templateid, true);
 			return;
 		}
@@ -204,8 +188,6 @@ window.widget_form = new class extends CWidgetForm {
 		if (hostid_inputs.length === 0) {
 			hostid_inputs = form.querySelectorAll('input[name*="hostids"]');
 		}
-		
-		console.log('Found hostid inputs:', hostid_inputs.length);
 		
 		const hostids = [];
 		hostid_inputs.forEach(input => {
@@ -229,73 +211,60 @@ window.widget_form = new class extends CWidgetForm {
 			return;
 		}
 
-		console.log('Using hostid:', hostids[0]);
 		// Use first selected host
 		this.showItemList(hostids[0], false);
 	}
 
 	/**
-	 * Fetch template ID from dashboard ID by examining the page
+	 * Fetch template ID from dashboard by examining the page
 	 */
 	fetchTemplateFromDashboard(dashboardid) {
-		console.log('Searching for templateid in page...');
-		
-		// Method 1: Check breadcrumb links for template
+		// Check breadcrumb links for template
 		const breadcrumbs = document.querySelectorAll('.breadcrumbs a');
-		console.log('Breadcrumbs found:', breadcrumbs.length);
 		for (let i = 0; i < breadcrumbs.length; i++) {
 			const href = breadcrumbs[i].getAttribute('href');
-			console.log('Breadcrumb', i, 'href:', href);
 			if (href && href.includes('templateid=')) {
 				const match = href.match(/[?&]templateid=(\d+)/);
 				if (match) {
-					console.log('Found templateid in breadcrumb:', match[1]);
 					this.showItemList(match[1], true);
 					return;
 				}
 			}
 		}
 		
-		// Method 2: Check all links on page for templates.php
+		// Check all links on page for templates.php
 		const allLinks = document.querySelectorAll('a[href*="templates.php"]');
-		console.log('Template links found:', allLinks.length);
 		for (let i = 0; i < allLinks.length; i++) {
 			const href = allLinks[i].getAttribute('href');
-			console.log('Template link', i, 'href:', href);
 			if (href && href.includes('templateid=')) {
 				const match = href.match(/[?&]templateid=(\d+)/);
 				if (match) {
-					console.log('Found templateid in link:', match[1]);
 					this.showItemList(match[1], true);
 					return;
 				}
 			}
 		}
 		
-		// Method 3: Check for data attributes
+		// Check for data attributes
 		const dashboardDiv = document.querySelector('[data-templateid]');
 		if (dashboardDiv) {
 			const tid = dashboardDiv.getAttribute('data-templateid');
-			console.log('Found data-templateid:', tid);
 			this.showItemList(tid, true);
 			return;
 		}
 		
-		// Method 4: Check all elements with data attributes
+		// Check all elements with data attributes
 		const allDataElements = document.querySelectorAll('[data-templateid], [data-template-id]');
-		console.log('Elements with template data attributes:', allDataElements.length);
 		for (let i = 0; i < allDataElements.length; i++) {
 			const tid = allDataElements[i].getAttribute('data-templateid') || 
 			            allDataElements[i].getAttribute('data-template-id');
 			if (tid) {
-				console.log('Found templateid in data attribute:', tid);
 				this.showItemList(tid, true);
 				return;
 			}
 		}
 		
 		// Failed to find templateid
-		console.error('Could not find templateid anywhere on the page');
 		overlayDialogue({
 			'title': 'Error',
 			'content': jQuery('<span>').text('Could not determine template ID. Please add a host filter to the widget first, or contact support.'),
@@ -328,8 +297,6 @@ window.widget_form = new class extends CWidgetForm {
 			method: 'GET',
 			dataType: 'json',
 			success: (response) => {
-				console.log('AJAX response:', response);
-				
 				if (response.error) {
 					const errorMsg = typeof response.error === 'string' 
 						? response.error 
@@ -346,10 +313,8 @@ window.widget_form = new class extends CWidgetForm {
 						]
 					});
 				} else if (response.items && Array.isArray(response.items)) {
-					console.log('Got items:', response.items.length);
 					this.displayItemSelector(response.items);
 				} else {
-					console.error('Unexpected response format:', response);
 					overlayDialogue({
 						'title': 'Error',
 						'content': jQuery('<span>').text('Unexpected response format from server'),
@@ -364,7 +329,6 @@ window.widget_form = new class extends CWidgetForm {
 				}
 			},
 			error: (xhr, status, error) => {
-				console.error('AJAX error:', xhr, status, error);
 				const errorMsg = xhr.responseText || error || 'Unknown error';
 				overlayDialogue({
 					'title': 'Error',
@@ -412,15 +376,11 @@ window.widget_form = new class extends CWidgetForm {
 				}
 				
 				// Close the dialog using the stored dialogue object
-				console.log('Closing dialog...');
 				if (this._currentDialogue && typeof this._currentDialogue.cancel === 'function') {
-					console.log('Calling dialogue.cancel()');
 					this._currentDialogue.cancel();
 				} else if (this._currentDialogue && typeof this._currentDialogue.close === 'function') {
-					console.log('Calling dialogue.close()');
 					this._currentDialogue.close();
 				} else if (this._currentDialogue && this._currentDialogue.$dialogue) {
-					console.log('Removing dialogue element');
 					// Try multiple methods to remove the dialog
 					if (typeof this._currentDialogue.unsetLoading === 'function') {
 						this._currentDialogue.unsetLoading();
@@ -443,8 +403,6 @@ window.widget_form = new class extends CWidgetForm {
 							jQuery(this).remove();
 						}
 					});
-				} else {
-					console.error('Could not close dialogue:', this._currentDialogue);
 				}
 				
 				// Reactivate the widget configuration dialog
@@ -452,11 +410,6 @@ window.widget_form = new class extends CWidgetForm {
 				setTimeout(function() {
 					// Find all remaining overlay dialogues
 					const allDialogs = jQuery('.overlay-dialogue');
-					console.log('All dialogs after close:', allDialogs.length);
-					
-					allDialogs.each(function(index) {
-						console.log('Dialog', index, ':', this);
-					});
 					
 					// Find the widget configuration dialog
 					const widgetDialog = allDialogs.filter(function() {
@@ -464,9 +417,6 @@ window.widget_form = new class extends CWidgetForm {
 					}).first();
 					
 					if (widgetDialog.length) {
-						console.log('Found widget dialog, reactivating');
-						console.log('Current z-index:', widgetDialog.css('z-index'));
-						
 						// Remove inactive state
 						widgetDialog.removeClass('inactive');
 						widgetDialog.addClass('active');
@@ -481,9 +431,6 @@ window.widget_form = new class extends CWidgetForm {
 							}
 						});
 						
-						console.log('Max overlay-bg z-index:', maxZIndex);
-						console.log('Setting dialog z-index to:', maxZIndex + 1);
-						
 						// Set widget dialog z-index higher than all overlays
 						widgetDialog.css('z-index', maxZIndex + 1);
 						
@@ -494,7 +441,6 @@ window.widget_form = new class extends CWidgetForm {
 						}).first();
 						
 						if (widgetBg.length) {
-							console.log('Found widget overlay-bg, adjusting z-index');
 							widgetBg.css('z-index', maxZIndex);
 						}
 						
@@ -507,12 +453,9 @@ window.widget_form = new class extends CWidgetForm {
 						
 						// Focus the item pattern field that was just updated
 						if (self._item_pattern) {
-							console.log('Focusing item pattern field');
 							self._item_pattern.focus();
 							self._item_pattern.select();
 						}
-					} else {
-						console.log('Widget dialog not found');
 					}
 				}, 100);
 			});
