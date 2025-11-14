@@ -1,247 +1,857 @@
-=== AI CONTEXT - MULTIGRAPH WIDGET (GENERIC) ===
-Updated: November 14, 2025
-Version: 0.1.6
+=== AI CONTEXT - MULTIGRAPH WIDGET (PUBLIC) ====== AI CONTEXT - MULTIGRAPH WIDGET (PUBLIC) =================================================================================== AI CONTEXT - MULTIGRAPH WIDGET (GENERIC) ===
 
-⚠️ SYNC ai.txt + ai_priv.txt | Update BOTH with: deployment/build/debug changes
-This file = generic context (Git-tracked). ai_priv.txt = local paths/credentials (git-ignored).
+Version: 0.1.7
 
-⚠️⚠️⚠️ DEPLOYMENT COMMANDS: CHECK ai_priv.txt FIRST! ⚠️⚠️⚠️
-README.md and USAGE.md contain GENERIC examples for documentation purposes.
-ACTUAL deployment commands for THIS environment are in ai_priv.txt (git-ignored).
-ai_priv.txt contains: container names, TrueNAS app management, verified procedures.
+Updated: 2025-11-14Version: 0.1.7
 
-⚠️ CRITICAL: NO DELETES WITHOUT APPROVAL ⚠️
-NEVER delete files/containers/images/code without listing & getting user confirmation first.
-Exception: Only ai_priv.txt/ai.txt context file recreation is auto-allowed.
+Repository: https://github.com/rheingold/zabbix_addons (branch: tmp0.1)
 
-⚠️ CONTEXT MAINTENANCE DIRECTIVE ⚠️
-When a problem is SOLVED:
-1. REMOVE the problem description from ai.txt/ai_priv.txt
-2. ADD solution note to relevant file:
-   - Code fixes → PHPDoc/JSDoc comment in source file where fix applied
-   - Build/deploy → Comment in Dockerfile or deployment script
-   - Architecture/design → Note in README.md relevant section
-3. Keep context files focused on CURRENT state, not historical issues
+Lead: lukas@plachy.eu | Dev: Claude Sonnet 4 (Anthropic) | License: MITUpdated: 2025-11-14MULTIGRAPH WIDGET - AI CONTEXT FILEUpdated: November 14, 2025
 
-================================================================================
-PROJECT OVERVIEW
-================================================================================
 
-PROJECT: Multigraph Widget for Zabbix 7.4.3+
-VERSION: 0.1.1 (Development - Untested for Classic UI)
-STARTED: November 5, 2025
-LAST UPDATED: November 10, 2025
 
-TEAM:
-  Lead & Architecture: lukas@plachy.eu
-  Development: Claude Sonnet 4 (AI Assistant, Anthropic)
+⚠️ CONTEXT MAINTENANCE DIRECTIVE ⚠️Repository: https://github.com/rheingold/zabbix_addons (branch: tmp0.1)
 
-DESCRIPTION:
-  Custom Zabbix dashboard widget for pattern-based multi-item graph visualization.
-  Instead of manual item selection, uses wildcard/regex patterns to dynamically
-  match items by name, enabling flexible multi-metric graphs.
+When problems are SOLVED:
 
-REPOSITORY: https://github.com/rheingold/zabbix_addons
-BRANCH: tmp0.1 (development)
-LICENSE: MIT
+1. Remove problem description from this fileLead: lukas@plachy.eu | Dev: Claude Sonnet 4 (Anthropic) | License: MIT=============================================================================Version: 0.1.6
 
-TECHNOLOGY STACK:
-  Backend: PHP 8.4+ (Zabbix 7.x requirement)
-  Frontend: JavaScript ES6+, HTML5 Canvas
-  Framework: Zabbix Widget Framework (MVC)
-  API: Zabbix API (Item, History)
-  Deployment: Docker (optional), SSH, PowerShell scripts
+2. Document solution in code comments or README.md
 
-================================================================================
-MAIN OBJECTIVES (D.2.1)
-================================================================================
+3. Add brief summary to "Last Resolved" section
 
-1. PATTERN-BASED ITEM SELECTION
-   Enable users to match items using wildcards (*, ?) or regular expressions
-   instead of manual selection, allowing dynamic graphs that auto-include new items.
+4. Keep only ACTIVE/UNRESOLVED issues in "Active Issues" section
 
-2. MULTI-ITEM VISUALIZATION
-   Display multiple matched items in single graph with customizable colors,
-   legend, and styling.
+⚠️ CONTEXT MAINTENANCE DIRECTIVE ⚠️Project: Zabbix Multigraph Widget
 
-3. DASHBOARD INTEGRATION
-   Full integration with Zabbix dashboard timeframe selector, supporting
-   absolute, relative, and period-rounding timeframes.
+=============================================================================
 
-4. CLIENT-SIDE RENDERING
-   Fast HTML5 Canvas-based rendering with hover tooltips and responsive resize.
+1. PROJECT OVERVIEWWhen problems are SOLVED:
 
-5. ZERO ZABBIX MODIFICATIONS
-   Self-contained widget requiring no modifications to Zabbix core files.
+=============================================================================
 
-================================================================================
-FUNCTIONAL REQUIREMENTS (D.2.2)
-================================================================================
+1. Remove problem description from this fileVersion: 0.1.7⚠️ SYNC ai.txt + ai_priv.txt | Update BOTH with: deployment/build/debug changes
 
-D.2.2.1: Pattern Matching
-  - Wildcard mode: *, ? characters for simple patterns
-  - Regex mode: Full PCRE regex support
-  - Case-sensitive matching
-  - Max 100 items matched per query (configurable)
+PURPOSE:
 
-D.2.2.2: Multi-Host Support
-  - Select multiple hosts
-  - Match items across all selected hosts
+Custom Zabbix 7.4.3+ dashboard widget for pattern-based multi-item graph2. Document solution in code comments or README.md
 
-D.2.2.3: Graph Rendering
+visualization using wildcards/regex instead of manual item selection.
+
+3. Keep only ACTIVE/UNRESOLVED issues hereLast Updated: 2025-11-14This file = generic context (Git-tracked). ai_priv.txt = local paths/credentials (git-ignored).
+
+CURRENT VERSION: v0.1.7
+
+Status: Fully functional, supports both host and template dashboards4. Update "Last Resolved" section with brief solution summary
+
+Known Limitations: Classic UI untested, no automated testing framework
+
+Repository: https://github.com/rheingold/zabbix_addons (branch: tmp0.1)
+
+REPOSITORY STRUCTURE:
+
+/src/                    # Widget source (deploy to /usr/share/zabbix/widgets/multigraph/)=============================================================================
+
+  manifest.json          # Widget registration, actions, version
+
+  Widget.php             # Entry point1. PROJECT OVERVIEW⚠️⚠️⚠️ DEPLOYMENT COMMANDS: CHECK ai_priv.txt FIRST! ⚠️⚠️⚠️
+
+  /actions/              # Controllers (WidgetView, ItemList, ModuleRescan)
+
+  /includes/             # Models (WidgetForm, GraphData, MatchedItemsData)=============================================================================
+
+  /views/                # Templates (widget.edit.php, widget.view.php, widget.edit.js.php)
+
+  /assets/               # Static files (class.widget.js, multigraph.css)Lead & Architecture: lukas@plachy.euREADME.md and USAGE.md contain GENERIC examples for documentation purposes.
+
+
+
+/ai_priv/                # Private deployment context (git-ignored)PURPOSE:
+
+  ai_priv.txt            # Deployment commands, credentials, SSH key reference
+
+Custom Zabbix 7.4.3+ dashboard widget for pattern-based multi-item graphDevelopment: Claude Sonnet 4 (AI Assistant, Anthropic)ACTUAL deployment commands for THIS environment are in ai_priv.txt (git-ignored).
+
+=============================================================================
+
+2. ACTIVE ISSUES & TODOvisualization using wildcards/regex instead of manual item selection.
+
+=============================================================================
+
+License: MITai_priv.txt contains: container names, TrueNAS app management, verified procedures.
+
+PRIORITY 1 - ENHANCEMENTS:
+
+[ ] Classic UI compatibility testingCURRENT VERSION: v0.1.7
+
+[ ] Large dataset performance optimization (>1000 points per series)
+
+[ ] X-axis time labels improvement (better granularity based on range)Status: Functional, production-ready for host dashboards
+
+[ ] Item limit configurable via UI (currently hardcoded 100 in MatchedItemsData.php)
+
+[ ] Y-axis label customizationKnown Limitations: Template dashboard support incomplete, Classic UI untested
+
+[ ] Threshold/alert visualization
+
+=============================================================================⚠️ CRITICAL: NO DELETES WITHOUT APPROVAL ⚠️
+
+=============================================================================
+
+3. LAST RESOLVED (v0.1.7 - Nov 14, 2025)REPOSITORY STRUCTURE:
+
+=============================================================================
+
+/src/                    # Widget source code (deploy to /usr/share/zabbix/widgets/multigraph/)PROJECT SUMMARYNEVER delete files/containers/images/code without listing & getting user confirmation first.
+
+Template Dashboard Support:
+
+- Problem: Pattern builder only worked with host dashboards  manifest.json          # Widget registration, actions, version
+
+- Solution: Detect templateid field, pass to ItemList.php, use 'templateids' parameter
+
+- Files: widget.edit.js.php (openItemSelector), ItemList.php (checkInput, doAction)  Widget.php             # Entry point=============================================================================Exception: Only ai_priv.txt/ai.txt context file recreation is auto-allowed.
+
+- Result: Pattern builder now works in both host and template dashboards
+
+  /actions/              # Controllers (WidgetView, ItemList, ModuleRescan)
+
+Pattern Builder Button Not Showing:
+
+- Problem: Button code in widget.edit.js (not loaded by Zabbix framework)  /includes/             # Models (WidgetForm, GraphData, MatchedItemsData)
+
+- Solution: Moved to widget.edit.js.php inline class constructor
+
+- Files: widget.edit.js.php (setupPatternBuilder method added)  /views/                # Templates (widget.edit.php, widget.view.php, widget.edit.js.php)
+
+- Result: Button appears and functions correctly
+
+  /assets/               # Static files (class.widget.js, multigraph.css)PURPOSE:⚠️ CONTEXT MAINTENANCE DIRECTIVE ⚠️
+
+AJAX Endpoint 404 Error:
+
+- Problem: widget.multigraphwidget.itemlist action not registered
+
+- Solution: Added action mapping in manifest.json
+
+- Files: manifest.json (actions section)/ai_priv/                # Private deployment context (git-ignored)Custom Zabbix 7.4.3+ dashboard widget for pattern-based multi-item graphWhen a problem is SOLVED:
+
+- Result: Endpoint accessible and returns proper JSON
+
+  ai_priv.txt            # Deployment commands, credentials
+
+HTML Returned Instead of JSON:
+
+- Problem: CControllerResponseData didn't work for AJAX responses  id_aibot               # SSH private keyvisualization. Enables dynamic graph creation using wildcards/regex instead1. REMOVE the problem description from ai.txt/ai_priv.txt
+
+- Solution: Direct JSON output via header('Content-Type: application/json') + echo json_encode()
+
+- Files: ItemList.php (doAction method)
+
+- Result: Proper JSON response format
+
+=============================================================================of manual item selection.2. ADD solution note to relevant file:
+
+=============================================================================
+
+4. ARCHITECTURE & KEY FILES2. ACTIVE ISSUES & TODO
+
+=============================================================================
+
+=============================================================================   - Code fixes → PHPDoc/JSDoc comment in source file where fix applied
+
+WIDGET LIFECYCLE:
+
+1. User opens widget config → widget.edit.php renders form HTML
+
+2. widget.edit.js.php creates inline class extending CWidgetForm
+
+3. setupColorSetHandler() + setupPatternBuilder() run in constructorPRIORITY 1 - IN PROGRESS:CURRENT STATUS: v0.1.7 - Pattern Builder UI Complete   - Build/deploy → Comment in Dockerfile or deployment script
+
+4. User saves → Widget.php validates input via WidgetForm.php
+
+5. Dashboard renders → WidgetView.php controller fetches data[ ] Template dashboard support for pattern builder
+
+6. widget.view.php outputs HTML canvas + setVar('graph_data', ...)
+
+7. class.widget.js (CWidgetMultigraph) renders graph on canvas    Problem: When widget is on template dashboard, hostids field empty- ✅ Core functionality (pattern matching, graph rendering)   - Architecture/design → Note in README.md relevant section
+
+
+
+PATTERN BUILDER FLOW (v0.1.7):    Solution: Detect templateid, fetch template items via API
+
+1. Button click → openItemSelector() detects host or template context
+
+2. showItemList(id, isTemplate) → AJAX to widget.multigraphwidget.itemlist    Files: widget.edit.js.php (frontend), ItemList.php (backend)- ✅ Named color sets (8 predefined palettes)3. Keep context files focused on CURRENT state, not historical issues
+
+3. ItemList.php fetches items via API::Item/ItemPrototype()->get()
+
+   - Uses 'hostids' parameter for hosts    API: API::Item()->get(['templateids' => ...])
+
+   - Uses 'templateids' parameter for templates
+
+4. displayItemSelector(items) renders modal with clickable item list- ✅ Interactive pattern builder with {#MACRO} support
+
+5. Click item → itemNameToPattern() converts {#MACROS} to */regex
+
+6. Pattern fills item_pattern field automaticallyPRIORITY 2 - ENHANCEMENTS:
+
+
+
+KEY API METHODS:[ ] Classic UI compatibility testing- ⚠️ Template dashboard support needed================================================================================
+
+- API::Item()->get(['hostids'|'templateids', 'filter', 'output', 'limit'])
+
+- API::ItemPrototype()->get(['hostids'|'templateids', 'output', 'limit'])[ ] Large dataset performance (>1000 points per series)
+
+- API::History()->get(['itemids', 'time_from', 'time_till', 'limit'])
+
+[ ] X-axis time labels improvement (better granularity)- ⚠️ Classic UI untestedPROJECT OVERVIEW
+
+CRITICAL FILES:
+
+- widget.edit.js.php: Form initialization, pattern builder, color sets[ ] Item limit configurable via UI (currently hardcoded 100)
+
+- ItemList.php: AJAX endpoint for fetching items/prototypes
+
+- class.widget.js: Client-side graph rendering (Canvas)- ⚠️ No automated testing framework================================================================================
+
+- WidgetForm.php: Form field definitions and validation
+
+- GraphData.php: History data fetching and preparation=============================================================================
+
+- MatchedItemsData.php: Pattern matching (wildcard/regex)
+
+3. LAST RESOLVED (v0.1.7)
+
+=============================================================================
+
+5. DEPLOYMENT (see ai_priv/ai_priv.txt for commands)=============================================================================
+
+=============================================================================
+
+=============================================================================PROJECT: Multigraph Widget for Zabbix 7.4.3+
+
+QUICK REFERENCE:
+
+- Single file: scp → docker cp to ix-zabbix-web-zabbix-web-1Pattern Builder Button Not Showing (Nov 14):
+
+- Full deploy: scp src/* → docker cp to container
+
+- Manifest change: Requires "Scan directory" in Zabbix UI- Problem: Button code in widget.edit.js (not loaded by Zabbix)COMPLETED FEATURES (v0.1.0 - v0.1.7)VERSION: 0.1.1 (Development - Untested for Classic UI)
+
+- JavaScript change: Browser cache clear (Ctrl+F5)
+
+- Solution: Moved to widget.edit.js.php inline class constructor
+
+Container: ix-zabbix-web-zabbix-web-1
+
+Widget Path: /usr/share/zabbix/widgets/multigraph/- Files: widget.edit.js.php (setupPatternBuilder method)=============================================================================STARTED: November 5, 2025
+
+
+
+=============================================================================
+
+6. VERSION HISTORY
+
+=============================================================================AJAX Endpoint 404 (Nov 14):LAST UPDATED: November 10, 2025
+
+
+
+v0.1.7 (2025-11-14) - Pattern Builder UI + Template Support- Problem: Action not registered in manifest
+
+- Interactive Pattern Builder button in edit form
+
+- ItemList.php AJAX endpoint (regular items + LLD prototypes)- Solution: Added "widget.multigraphwidget.itemlist" → ItemList classv0.1.7 (2025-11-14) - PATTERN BUILDER UI
+
+- Modal selector with {#MACRO} → wildcards/regex conversion
+
+- Template dashboard support (detects templateid, uses templateids parameter)- Files: manifest.json, ItemList.php
+
+- Action registered: widget.multigraphwidget.itemlist
+
+- Interactive Pattern Builder button in widget edit formTEAM:
+
+v0.1.6 (2025-11-13) - Named Color Sets
+
+- 8 predefined color palettes dropdownHTML Returned Instead of JSON (Nov 14):
+
+- Integer keys (0-7) for storage efficiency
+
+- Auto-populate graph_colors field on selection- Problem: CControllerResponseData not working for AJAX- AJAX endpoint (ItemList.php) fetches items + LLD prototypes  Lead & Architecture: lukas@plachy.eu
+
+
+
+v0.1.5 (2025-11-12) - Module Rescan- Solution: Direct JSON output via header() + json_encode()
+
+- Cache clearing action for hot-reload
+
+- No web server restart needed- Files: ItemList.php (doAction method)- Modal dialog shows clickable item list with {#MACROS}  Development: Claude Sonnet 4 (AI Assistant, Anthropic)
+
+
+
+v0.1.0 (2025-11-10) - Initial Release
+
+- Pattern matching (wildcard/regex)
+
+- HTML5 Canvas graph rendering=============================================================================- Auto-converts {#DISK} → * (wildcard) or .+ (regex)
+
+- Dashboard timeframe integration
+
+- Multi-host support4. ARCHITECTURE & KEY FILES
+
+
+
+==========================================================================================================================================================- Validates host selection before fetchDESCRIPTION:
+
+7. ZABBIX API QUICK REFERENCE
+
+=============================================================================
+
+
+
+FETCH HOST ITEMS:WIDGET LIFECYCLE:- Registered action: widget.multigraphwidget.itemlist  Custom Zabbix dashboard widget for pattern-based multi-item graph visualization.
+
+API::Item()->get([
+
+    'output' => ['itemid', 'name', 'key_'],1. User opens widget config → widget.edit.php renders form
+
+    'hostids' => $hostid,
+
+    'filter' => ['flags' => ZBX_FLAG_DISCOVERY_NORMAL],2. widget.edit.js.php creates inline class extending CWidgetForm  Instead of manual item selection, uses wildcard/regex patterns to dynamically
+
+    'sortfield' => 'name',
+
+    'limit' => 10003. setupColorSetHandler() + setupPatternBuilder() in constructor
+
+]);
+
+4. User saves → Widget.php validates via WidgetForm.phpv0.1.6 (2025-11-13) - NAMED COLOR SETS  match items by name, enabling flexible multi-metric graphs.
+
+FETCH TEMPLATE ITEMS:
+
+API::Item()->get([5. Dashboard renders → WidgetView.php fetches data
+
+    'output' => ['itemid', 'name', 'key_'],
+
+    'templateids' => $templateid,6. widget.view.php outputs HTML + setVar('graph_data', ...)- Dropdown with 8 predefined color palettes
+
+    'sortfield' => 'name',
+
+    'limit' => 10007. class.widget.js (CWidgetMultigraph) renders canvas graph
+
+]);
+
+- Integer keys (0-7) for efficient storageREPOSITORY: https://github.com/rheingold/zabbix_addons
+
+FETCH LLD PROTOTYPES (HOST OR TEMPLATE):
+
+API::ItemPrototype()->get([PATTERN BUILDER FLOW:
+
+    'output' => ['itemid', 'name', 'key_'],
+
+    'hostids' => $hostid,           // OR 'templateids' => $templateid1. Button click → openItemSelector() validates host/template- Auto-populates graph_colors field on selectionBRANCH: tmp0.1 (development)
+
+    'sortfield' => 'name',
+
+    'limit' => 10002. showItemList(id, isTemplate) → AJAX to widget.multigraphwidget.itemlist
+
+]);
+
+3. ItemList.php fetches items via API::Item/ItemPrototype()->get()- Sets: Default, Light, Vibrant, Earth, Sunset, Neon, Forest, GrayscaleLICENSE: MIT
+
+FETCH HISTORY DATA:
+
+API::History()->get([4. displayItemSelector(items) renders modal with clickable list
+
+    'itemids' => [$itemid1, $itemid2],
+
+    'time_from' => $timestamp_start,5. Click item → itemNameToPattern() converts {#MACROS}
+
+    'time_till' => $timestamp_end,
+
+    'history' => $value_type,        // 0=float, 3=uint64, 4=text6. Pattern fills item_pattern field
+
+    'sortfield' => 'clock',
+
+    'sortorder' => 'ASC',v0.1.5 (2025-11-12) - MODULE RESCANTECHNOLOGY STACK:
+
+    'limit' => 10000
+
+]);KEY API METHODS:
+
+
+
+=============================================================================- API::Item()->get(['hostids'|'templateids', 'filter', 'output', 'limit'])- Added rescan action for cache clearing  Backend: PHP 8.4+ (Zabbix 7.x requirement)
+
+END OF AI CONTEXT FILE
+
+=============================================================================- API::ItemPrototype()->get(['hostids'|'templateids', 'output', 'limit'])
+
+
+- API::History()->get(['itemids', 'time_from', 'time_till', 'limit'])- Enables hot-reload without web server restart  Frontend: JavaScript ES6+, HTML5 Canvas
+
+
+
+=============================================================================  Framework: Zabbix Widget Framework (MVC)
+
+5. DEPLOYMENT (see ai_priv/ai_priv.txt for commands)
+
+=============================================================================v0.1.0 (2025-11-10) - INITIAL RELEASE  API: Zabbix API (Item, History)
+
+
+
+QUICK REFERENCE:- Pattern matching (wildcard/regex)  Deployment: Docker (optional), SSH, PowerShell scripts
+
+- Single file: scp → docker cp
+
+- Full deploy: scp src/* → docker cp to container- HTML5 Canvas graph rendering
+
+- Manifest change: Requires "Scan directory" in Zabbix UI
+
+- JavaScript change: Browser cache clear (Ctrl+F5)- Dashboard timeframe integration================================================================================
+
+
+
+Container: ix-zabbix-web-zabbix-web-1- Multi-host supportMAIN OBJECTIVES (D.2.1)
+
+Path: /usr/share/zabbix/widgets/multigraph/
+
+- Configurable graph options================================================================================
+
+=============================================================================
+
+6. VERSION HISTORY
+
+=============================================================================
+
+=============================================================================1. PATTERN-BASED ITEM SELECTION
+
+v0.1.7 (2025-11-14) - Pattern Builder UI
+
+- Interactive Pattern Builder button in edit formARCHITECTURE OVERVIEW   Enable users to match items using wildcards (*, ?) or regular expressions
+
+- ItemList.php AJAX endpoint (items + LLD prototypes)
+
+- Modal selector with {#MACRO} → */regex conversion=============================================================================   instead of manual selection, allowing dynamic graphs that auto-include new items.
+
+- Action registered: widget.multigraphwidget.itemlist
+
+
+
+v0.1.6 (2025-11-13) - Named Color Sets
+
+- 8 predefined color palettes dropdownWIDGET STRUCTURE:2. MULTI-ITEM VISUALIZATION
+
+- Integer keys (0-7) for storage efficiency
+
+- Auto-populate graph_colors field/usr/share/zabbix/widgets/multigraph/   Display multiple matched items in single graph with customizable colors,
+
+
+
+v0.1.5 (2025-11-12) - Module Rescan├── manifest.json          # Widget registration, actions   legend, and styling.
+
+- Cache clearing action
+
+- Hot-reload without web server restart├── Widget.php            # Main entry point
+
+
+
+v0.1.0 (2025-11-10) - Initial Release├── actions/3. DASHBOARD INTEGRATION
+
+- Pattern matching (wildcard/regex)
+
+- HTML5 Canvas rendering│   ├── WidgetView.php    # Graph view controller   Full integration with Zabbix dashboard timeframe selector, supporting
+
+- Dashboard timeframe integration
+
+- Multi-host support│   ├── ModuleRescan.php  # Cache clear action   absolute, relative, and period-rounding timeframes.
+
+
+
+=============================================================================│   └── ItemList.php      # Pattern builder AJAX endpoint
+
+7. ZABBIX API QUICK REFERENCE
+
+=============================================================================├── includes/4. CLIENT-SIDE RENDERING
+
+
+
+FETCH HOST ITEMS:│   ├── WidgetForm.php    # Form field definitions   Fast HTML5 Canvas-based rendering with hover tooltips and responsive resize.
+
+API::Item()->get([
+
+    'output' => ['itemid', 'name', 'key_'],│   ├── GraphData.php     # History data fetching
+
+    'hostids' => $hostid,
+
+    'filter' => ['flags' => ZBX_FLAG_DISCOVERY_NORMAL],│   └── MatchedItemsData.php  # Item pattern matching5. ZERO ZABBIX MODIFICATIONS
+
+    'sortfield' => 'name',
+
+    'limit' => 1000├── views/   Self-contained widget requiring no modifications to Zabbix core files.
+
+]);
+
+│   ├── widget.edit.php   # Edit form HTML
+
+FETCH TEMPLATE ITEMS:
+
+API::Item()->get([│   ├── widget.edit.js.php # Edit form JavaScript (inline class)================================================================================
+
+    'output' => ['itemid', 'name', 'key_'],
+
+    'templateids' => $templateid,│   └── widget.view.php   # Display view HTMLFUNCTIONAL REQUIREMENTS (D.2.2)
+
+    'sortfield' => 'name',
+
+    'limit' => 1000└── assets/================================================================================
+
+]);
+
+    ├── js/
+
+FETCH LLD PROTOTYPES:
+
+API::ItemPrototype()->get([    │   ├── class.widget.js   # Main widget class (CWidgetMultigraph)D.2.2.1: Pattern Matching
+
+    'output' => ['itemid', 'name', 'key_'],
+
+    'hostids' => $hostid,           // or 'templateids' => $templateid    │   └── widget.edit.js    # Helper functions (not directly loaded)  - Wildcard mode: *, ? characters for simple patterns
+
+    'sortfield' => 'name',
+
+    'limit' => 1000    └── css/  - Regex mode: Full PCRE regex support
+
+]);
+
+        └── multigraph.css  - Case-sensitive matching
+
+=============================================================================
+
+END OF AI CONTEXT FILE  - Max 100 items matched per query (configurable)
+
+=============================================================================
+
+KEY CLASSES:
+
+- CWidgetMultigraph (class.widget.js) - Client-side graph renderingD.2.2.2: Multi-Host Support
+
+- WidgetForm (widget.edit.js.php) - Form initialization, event handlers  - Select multiple hosts
+
+- GraphData.php - Fetches history data via API::History()->get()  - Match items across all selected hosts
+
+- MatchedItemsData.php - Matches items via API::Item()->get()
+
+- ItemList.php - AJAX endpoint for pattern builderD.2.2.3: Graph Rendering
+
   - HTML5 Canvas dual-layer architecture (base + overlay)
-  - Time series line and area charts
-  - Automatic Y-axis scaling or fixed range
-  - Grid with configurable density
+
+=============================================================================  - Time series line and area charts
+
+DEPLOYMENT WORKFLOW  - Automatic Y-axis scaling or fixed range
+
+=============================================================================  - Grid with configurable density
+
   - Legend with configurable position (top-left, right, bottom)
 
-D.2.2.4: Interactivity
+LOCAL DEVELOPMENT:
+
+Windows PowerShell → SSH/SCP to remote Linux server → Docker containerD.2.2.4: Interactivity
+
   - Hover tooltips showing value, timestamp, series name
-  - Data point interpolation for smooth hover
-  - Responsive resize with automatic redraw
 
-D.2.2.5: Customization
-  - Configurable colors (comma-separated hex)
-  - Fill opacity (0-1)
+Commands:  - Data point interpolation for smooth hover
+
+1. scp -i ai_priv/id_aibot ./src/* aibot@192.168.254.16:/tmp/multigraph/  - Responsive resize with automatic redraw
+
+2. ssh -i ai_priv/id_aibot aibot@192.168.254.16 \
+
+   "sudo docker cp /tmp/multigraph/* \D.2.2.5: Customization
+
+   ix-zabbix-web-zabbix-web-1:/usr/share/zabbix/widgets/multigraph/"  - Configurable colors (comma-separated hex)
+
+3. Browser: Administration → General → Modules → Scan directory  - Fill opacity (0-1)
+
   - Y-axis range (auto or fixed min/max)
-  - Grid enable/disable
-  - Text colors (legend, axes)
 
-D.2.2.6: Timeframe Support
-  - Absolute: Unix timestamp, ISO date strings
+PRODUCTION DEPLOYMENT:  - Grid enable/disable
+
+1. Clone/pull from GitHub  - Text colors (legend, axes)
+
+2. Copy src/* to /usr/share/zabbix/widgets/multigraph/
+
+3. Set permissions: chmod -R 755D.2.2.6: Timeframe Support
+
+4. Scan modules in Zabbix UI  - Absolute: Unix timestamp, ISO date strings
+
   - Relative: now-Xh, now-Xd, now-Xw, now-XM, now-Xy
-  - Period rounding: now/d (today), now/w (week), now/M (month), now/y (year)
-  - Integration with dashboard time selector
+
+=============================================================================  - Period rounding: now/d (today), now/w (week), now/M (month), now/y (year)
+
+PATTERN BUILDER IMPLEMENTATION (v0.1.7)  - Integration with dashboard time selector
+
+=============================================================================
 
 ================================================================================
-DETAILED CONSTRAINTS (D.2.3)
-================================================================================
 
-D.2.3.1: Platform Constraints
+ARCHITECTURE:DETAILED CONSTRAINTS (D.2.3)
+
+Frontend: widget.edit.js.php (inline class extending CWidgetForm)================================================================================
+
+Backend: ItemList.php (CController extending action)
+
+Registration: manifest.json → "widget.multigraphwidget.itemlist"D.2.3.1: Platform Constraints
+
   - Zabbix 7.4.3+ widget framework
-  - PHP 8.4+ backend
-  - Modern browser with HTML5 Canvas and ES6 JavaScript
-  - Dashboard (New UI) only - Classic UI not tested
 
-D.2.3.2: Performance Constraints
-  - Widget load < 2 seconds (typical)
-  - Max 1000 data points per series (recommended)
+FRONTEND (widget.edit.js.php):  - PHP 8.4+ backend
+
+- setupPatternBuilder() - Called from constructor  - Modern browser with HTML5 Canvas and ES6 JavaScript
+
+- trySetupPatternBuilder() - Creates button, retries with timeouts  - Dashboard (New UI) only - Classic UI not tested
+
+- openItemSelector() - Validates host selection
+
+- showItemList(hostid) - AJAX call to itemlist endpointD.2.3.2: Performance Constraints
+
+- displayItemSelector(items) - Renders modal with clickable list  - Widget load < 2 seconds (typical)
+
+- itemNameToPattern(name) - Converts {#MACRO} → * or .+  - Max 1000 data points per series (recommended)
+
   - Max 100 items matched per query
-  - Canvas rendering up to 4K resolution
 
-D.2.3.3: Usability Constraints
-  - All fields validated before save
-  - Clear error messages
-  - Graceful "no data" handling
-  - Responsive to all dashboard cell sizes
+BACKEND (ItemList.php):  - Canvas rendering up to 4K resolution
 
-D.2.3.4: Security Constraints
-  - Zabbix session authentication
-  - Respects user host/item permissions
-  - Input sanitization and validation
-  - XSS prevention in templates
+- checkPermissions() - Requires USER_TYPE_ZABBIX_USER
 
-D.2.3.5: Browser Compatibility
-  - Required: HTML5 Canvas, ES6 JavaScript
-  - Tested: Chrome 90+, Firefox 88+, Edge 90+
+- checkInput() - Validates hostid parameterD.2.3.3: Usability Constraints
+
+- doAction() - Fetches items via API:  - All fields validated before save
+
+  * API::Item()->get() - Regular items  - Clear error messages
+
+  * API::ItemPrototype()->get() - LLD prototypes with {#MACROS}  - Graceful "no data" handling
+
+  * Merges, sorts, returns JSON  - Responsive to all dashboard cell sizes
+
+
+
+AJAX FLOW:D.2.3.4: Security Constraints
+
+1. Button click → openItemSelector()  - Zabbix session authentication
+
+2. Find hostids from form multiselect (tries multiple patterns)  - Respects user host/item permissions
+
+3. Validate at least one host selected  - Input sanitization and validation
+
+4. showItemList(hostid) → AJAX GET zabbix.php?action=widget.multigraphwidget.itemlist  - XSS prevention in templates
+
+5. ItemList.php returns JSON: {items: [{itemid, name, key_}, ...]}
+
+6. displayItemSelector() renders modal with item listD.2.3.5: Browser Compatibility
+
+7. Click item → itemNameToPattern() converts macros  - Required: HTML5 Canvas, ES6 JavaScript
+
+8. Pattern fills item_pattern field  - Tested: Chrome 90+, Firefox 88+, Edge 90+
+
   - Not tested: IE11, Classic Zabbix UI, Safari
 
-================================================================================
-ARCHITECTURAL CONSTRAINTS (D.2.4)
+MACRO CONVERSION:
+
+- Pattern mode 0 (wildcard): {#DISK} → *================================================================================
+
+- Pattern mode 1 (regex): {#DISK} → .+ARCHITECTURAL CONSTRAINTS (D.2.4)
+
 ================================================================================
 
-1. WIDGET FRAMEWORK COMPLIANCE
-   - Must extend Zabbix CWidget base class
+=============================================================================
+
+KNOWN ISSUES & TODO1. WIDGET FRAMEWORK COMPLIANCE
+
+=============================================================================   - Must extend Zabbix CWidget base class
+
    - MVC pattern: actions/ (controllers), includes/ (models), views/ (templates)
-   - Namespace: Widgets\Multigraph\{Actions|Includes}
-   - PSR-4 autoloading (directory names must match namespace)
 
-2. DATA ACCESS
-   - Use Zabbix API only (no direct database access)
+CRITICAL:   - Namespace: Widgets\Multigraph\{Actions|Includes}
+
+- Template dashboard support: Pattern builder needs template item fetching   - PSR-4 autoloading (directory names must match namespace)
+
+  when widget is on template dashboard (not regular host dashboard)
+
+- Classic UI compatibility: Untested, may not work2. DATA ACCESS
+
+- No automated testing framework   - Use Zabbix API only (no direct database access)
+
    - API::Item()::get() for item matching
-   - API::History()::get() for time series data
 
-3. RENDERING ARCHITECTURE
-   - Server-side: PHP controllers prepare data
-   - Client-side: JavaScript renders to Canvas
+ENHANCEMENTS:   - API::History()::get() for time series data
+
+- Item limit not configurable via UI (hardcoded 100)
+
+- Large dataset performance not optimized (>1000 points)3. RENDERING ARCHITECTURE
+
+- No Y-axis label customization   - Server-side: PHP controllers prepare data
+
+- No threshold/alert visualization   - Client-side: JavaScript renders to Canvas
+
    - No server-side image generation
-   - No external JavaScript libraries (jQuery available from Zabbix)
 
-4. DEPLOYMENT ISOLATION
+=============================================================================   - No external JavaScript libraries (jQuery available from Zabbix)
+
+TEMPLATE DASHBOARD SUPPORT - NEXT TASK
+
+=============================================================================4. DEPLOYMENT ISOLATION
+
    - Self-contained in /usr/share/zabbix/widgets/multigraph/
-   - No modifications to Zabbix core files
-   - manifest.json for registration
-   - Scan directory for detection
 
-================================================================================
+PROBLEM:   - No modifications to Zabbix core files
+
+When widget is added to template dashboard, hostids field is empty/different.   - manifest.json for registration
+
+Pattern builder needs to detect template context and fetch:   - Scan directory for detection
+
+- Template items (not host items)
+
+- Template LLD rules and prototypes================================================================================
+
 PROJECT STRUCTURE (D.2.5)
-================================================================================
 
-multigraph/
-├── README.md                      # Comprehensive project documentation (B.1-B.10)
-├── USAGE.md                       # User and admin manuals (C.1-C.2)
-├── LICENSE                        # MIT License
-├── .gitignore                     # Git exclusions
-├── ai.txt                         # This file - AI context (generic)
-├── ai_priv/                       # Git-ignored local context
+SOLUTION APPROACH:================================================================================
+
+1. Detect template context in openItemSelector()
+
+   - Check for templateid field instead of hostidsmultigraph/
+
+   - Try: form.querySelector('input[name="templateid"]')├── README.md                      # Comprehensive project documentation (B.1-B.10)
+
+2. Update ItemList.php to accept templateid parameter├── USAGE.md                       # User and admin manuals (C.1-C.2)
+
+3. Add template item fetching:├── LICENSE                        # MIT License
+
+   - API::Item()->get(['templateids' => $templateid])├── .gitignore                     # Git exclusions
+
+   - API::ItemPrototype()->get(['templateids' => $templateid])├── ai.txt                         # This file - AI context (generic)
+
+4. Pass template flag to determine context├── ai_priv/                       # Git-ignored local context
+
 │   ├── ai_priv.txt               # Local paths, credentials, deployment details
-│   └── id_aibot                  # SSH private key for deployment
+
+ALTERNATIVE:│   └── id_aibot                  # SSH private key for deployment
+
+- Check dashboard type in backend via dashboard API│
+
+- Determine if it's template dashboard or regular├── docker/                        # Deployment helpers
+
+- Route to appropriate item fetch method│   └── modules_rescan.php        # HTTP-accessible module rescan helper
+
 │
-├── docker/                        # Deployment helpers
-│   └── modules_rescan.php        # HTTP-accessible module rescan helper
-│
-├── zabbix-helpers.ps1            # PowerShell deployment functions
-│
-├── deprecated/                    # Git-ignored old code (kept for reference)
+
+=============================================================================├── zabbix-helpers.ps1            # PowerShell deployment functions
+
+ZABBIX API REFERENCE│
+
+=============================================================================├── deprecated/                    # Git-ignored old code (kept for reference)
+
 │   ├── tmptest/                  # API rescan experiments
-│   └── oldmodule/                # Old module-based approach
-│
-└── src/                           # Widget source (Zabbix-compatible structure)
-    ├── manifest.json              # Widget manifest - registration metadata
-    ├── Widget.php                 # Entry point - extends CWidget
-    ├── README.md                  # Source structure documentation
-    │
-    ├── actions/                   # MVC Controllers
-    │   ├── README.md
+
+ITEM FETCHING:│   └── oldmodule/                # Old module-based approach
+
+API::Item()->get([│
+
+    'output' => ['itemid', 'name', 'key_'],└── src/                           # Widget source (Zabbix-compatible structure)
+
+    'hostids' => $hostid,           // For host items    ├── manifest.json              # Widget manifest - registration metadata
+
+    'templateids' => $templateid,   // For template items    ├── Widget.php                 # Entry point - extends CWidget
+
+    'filter' => ['flags' => ZBX_FLAG_DISCOVERY_NORMAL],    ├── README.md                  # Source structure documentation
+
+    'sortfield' => 'name',    │
+
+    'limit' => 1000    ├── actions/                   # MVC Controllers
+
+]);    │   ├── README.md
+
     │   ├── WidgetView.php         # Display controller (data orchestration)
-    │   └── WidgetEdit.php         # Configuration controller
-    │
-    ├── includes/                  # MVC Models + Forms
-    │   ├── README.md
-    │   ├── GraphData.php          # History data fetching and preparation
-    │   ├── MatchedItemsData.php   # Item pattern matching (wildcard/regex)
-    │   └── WidgetForm.php         # Configuration form definition
-    │
+
+ITEM PROTOTYPE FETCHING:    │   └── WidgetEdit.php         # Configuration controller
+
+API::ItemPrototype()->get([    │
+
+    'output' => ['itemid', 'name', 'key_'],    ├── includes/                  # MVC Models + Forms
+
+    'hostids' => $hostid,           // For host LLD    │   ├── README.md
+
+    'templateids' => $templateid,   // For template LLD    │   ├── GraphData.php          # History data fetching and preparation
+
+    'sortfield' => 'name',    │   ├── MatchedItemsData.php   # Item pattern matching (wildcard/regex)
+
+    'limit' => 1000    │   └── WidgetForm.php         # Configuration form definition
+
+]);    │
+
     ├── views/                     # MVC Views / Templates
-    │   ├── README.md
-    │   ├── widget.view.php        # Display template (canvas HTML)
-    │   ├── widget.edit.php        # Configuration form template
+
+=============================================================================    │   ├── README.md
+
+FILE CHANGE LOG    │   ├── widget.view.php        # Display template (canvas HTML)
+
+=============================================================================    │   ├── widget.edit.php        # Configuration form template
+
     │   └── widget.edit.js.php     # Configuration JavaScript initialization
-    │
-    └── assets/                    # Frontend resources
-        ├── js/
+
+src/manifest.json (v0.1.7):    │
+
+- Added "widget.multigraphwidget.itemlist" action → ItemList class    └── assets/                    # Frontend resources
+
+- Updated version to 0.1.7        ├── js/
+
         │   ├── README.md
-        │   ├── class.widget.js    # Main widget JavaScript (CWidget extension)
-        │   └── widget.edit.js     # Configuration form JavaScript
-        └── css/
-            ├── README.md
+
+src/views/widget.edit.js.php (v0.1.7):        │   ├── class.widget.js    # Main widget JavaScript (CWidget extension)
+
+- Added setupPatternBuilder() to constructor        │   └── widget.edit.js     # Configuration form JavaScript
+
+- Added pattern builder methods (6 new functions)        └── css/
+
+- Uses multiple DOM query fallbacks for form reference            ├── README.md
+
             └── multigraph.css     # Widget styles
 
-DEPLOYMENT TARGET:
-  /usr/share/zabbix/widgets/multigraph/
+src/actions/ItemList.php (NEW v0.1.7):
+
+- AJAX endpoint for fetching items + prototypesDEPLOYMENT TARGET:
+
+- Direct JSON output (header + echo json_encode)  /usr/share/zabbix/widgets/multigraph/
+
+- Combines regular items + LLD prototypes
 
 ================================================================================
-CRITICAL LESSONS LEARNED (D.1 - Kept for AI Reference)
-================================================================================
+
+src/assets/js/widget.edit.js (v0.1.7):CRITICAL LESSONS LEARNED (D.1 - Kept for AI Reference)
+
+- Contains helper methods (not directly loaded)================================================================================
+
+- Debug logging added then removed
 
 These are SOLVED issues - solutions documented in code comments and README.md.
-Kept here ONLY for AI context to avoid repeating mistakes.
 
-1. WIDGET DEVELOPMENT WORKFLOW
-   LESSON: Configuration fields, data flow, view templates, JavaScript rendering
+README.md (v0.1.7):Kept here ONLY for AI context to avoid repeating mistakes.
+
+- Updated version history
+
+- Documented pattern builder feature1. WIDGET DEVELOPMENT WORKFLOW
+
+- Updated header to v0.1.7   LESSON: Configuration fields, data flow, view templates, JavaScript rendering
+
            must ALL align precisely or widget fails silently.
-   SOLUTION: Documented in README.md Section B.10 (Source Structure)
-   CODE: See PHPDoc headers in all source files
+
+=============================================================================   SOLUTION: Documented in README.md Section B.10 (Source Structure)
+
+END OF AI CONTEXT FILE   CODE: See PHPDoc headers in all source files
+
+=============================================================================
 
 2. DATA STRUCTURE SYNCHRONIZATION
    LESSON: PHP array structure from WidgetView MUST exactly match JavaScript
