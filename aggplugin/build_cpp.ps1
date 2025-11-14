@@ -62,14 +62,14 @@ try {
 
     if ($Variant -eq 'agent2' -or $Variant -eq 'both') {
         Write-Host "Building agent2 plugin DLL (requires agent2 headers/libs)..."
-        g++ -shared -o "../build/aggplugin_agent2.dll" unified_wrapper.cpp "$commonPath/plugin_common.cpp" "$commonPath/collector.cpp" -I"$PWD/../../../zabbixlib/include" -I"$commonPath" -DZABBIX_AGENT2 -static-libgcc -static-libstdc++ -lpdh
+        g++ -shared -o "../build/aggplugin_agent2.dll" unified_wrapper.cpp "$commonPath/plugin_common.cpp" "$commonPath/collector.cpp" "$commonPath/plugin_loader.cpp" -I"$PWD/../../../zabbixlib/include" -I"$commonPath" -DZABBIX_AGENT2 -static-libgcc -static-libstdc++ -lpdh
         if ($LASTEXITCODE -ne 0) { Write-Warning "agent2 build failed (likely missing SDK headers/libs)." }
         else { Write-Host "Created build/aggplugin_agent2.dll" }
     }
 
     # Build collector shared library for CGO
     Write-Host "Building collector shared library for Go CGO..."
-    g++ -shared -o "../build/libaggcollector.dll" "$commonPath/collector_shared.cpp" "$commonPath/collector.cpp" "$commonPath/plugin_common.cpp" -I"$commonPath" -static-libgcc -static-libstdc++ -lpdh
+    g++ -shared -o "../build/libaggcollector.dll" "$commonPath/collector_shared.cpp" "$commonPath/collector.cpp" "$commonPath/plugin_common.cpp" "$commonPath/plugin_loader.cpp" -I"$commonPath" -static-libgcc -static-libstdc++ -lpdh
     if ($LASTEXITCODE -ne 0) { Write-Warning "collector shared library build failed." }
     else { Write-Host "Created build/libaggcollector.dll" }
 }

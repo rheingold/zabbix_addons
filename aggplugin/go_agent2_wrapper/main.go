@@ -99,6 +99,7 @@ package main
 #cgo CFLAGS: -IC:/msys64/mingw64/include -I../cpp_common
 #cgo LDFLAGS: -L../build -laggcollector
 #include <stdlib.h>
+#include <windows.h>
 
 // C++ collector functions from collector.hpp
 extern void collector_init(double base_interval_seconds);
@@ -106,6 +107,10 @@ extern void collector_stop(void);
 extern int collector_register_metric(const char *name, double multiplicator);
 extern int collector_set_max_samples(const char *name, unsigned max_samples);
 extern int collector_fetch_and_reset_json(const char *name, char *result, unsigned result_len);
+
+// Plugin registry functions from plugin_loader.hpp
+extern int register_measurement_plugin(const char* metric_key, void* dll_handle, void* collect_func, size_t key_index);
+extern void unregister_all_plugins();
 */
 import "C"
 
@@ -115,6 +120,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -158,6 +164,55 @@ var cfgDebugLevel = 0                       // 0=None/Fatal, 1=Error, 2=Warning,
 var cfgMaxSamples = 1000                    // Maximum samples per metric before auto-reset
 var cfgPreloadMetrics = "cpu_load,mem_free" // Comma-separated list of metrics to preload on startup
 var cfgPreloadDelay = 0.0                   // Seconds to wait for baseline (0 = no delay, immediate availability)
+var cfgPluginPath = ""                      // Path pattern for measurement plugin DLLs (e.g., C:\Zabbix\plugins\*.dll)
+
+// ========================================================================
+// MEASUREMENT PLUGIN LOADER
+// ========================================================================
+
+// Measurement plugin structures (matching measurement_plugin_api.h)
+type MetricKeyInfo struct {
+	Key                string
+	Description        string
+	Type               int32
+	Parameters         string
+	HasMultipleSources int32
+}
+
+type PluginInfo struct {
+	Name     string
+	Version  string
+	Author   string
+	KeyCount int
+	Keys     []MetricKeyInfo
+}
+
+type MeasurementValue struct {
+	SourceID *byte // C string pointer
+	Value    float64
+	StrValue *byte // C string pointer
+}
+
+type CollectionResult struct {
+	Key        *byte // C string pointer
+	Status     int32
+	ValueCount uint64
+	Values     *MeasurementValue
+}
+
+// Loaded plugin instance
+type LoadedPlugin struct {
+	DLLPath     string
+	Handle      syscall.Handle
+	Info        PluginInfo
+	GetInfoFunc uintptr
+	InitFunc    uintptr
+	CollectFunc uintptr
+	DeinitFunc  uintptr
+}
+
+// Global plugin registry
+var loadedPlugins []LoadedPlugin
 
 // Plugin implementation
 type Plugin struct {
@@ -166,6 +221,204 @@ type Plugin struct {
 
 // impl is the singleton plugin implementation
 var impl Plugin
+
+// ========================================================================
+// PLUGIN LOADING FUNCTIONS
+// ========================================================================
+
+// loadMeasurementPlugins scans for DLLs matching PluginPath pattern and loads them
+func loadMeasurementPlugins() error {
+	if cfgPluginPath == "" {
+		debugLog(DBG_INFO, "No PluginPath configured, skipping measurement plugin loading")
+		return nil
+	}
+
+	debugLog(DBG_INFO, fmt.Sprintf("Scanning for plugins: %s", cfgPluginPath))
+
+	// Find all DLL files matching the pattern
+	matches, err := filepath.Glob(cfgPluginPath)
+	if err != nil {
+		return fmt.Errorf("failed to scan plugin path: %v", err)
+	}
+
+	debugLog(DBG_INFO, fmt.Sprintf("Found %d plugin DLL(s)", len(matches)))
+
+	for _, dllPath := range matches {
+		if err := loadSinglePlugin(dllPath); err != nil {
+			debugLog(DBG_ERROR, fmt.Sprintf("Failed to load plugin %s: %v", dllPath, err))
+			// Continue loading other plugins
+		}
+	}
+
+	debugLog(DBG_INFO, fmt.Sprintf("Loaded %d measurement plugin(s)", len(loadedPlugins)))
+	return nil
+}
+
+// loadSinglePlugin loads a single measurement plugin DLL
+func loadSinglePlugin(dllPath string) error {
+	debugLog(DBG_VERBOSE, fmt.Sprintf("Loading plugin: %s", dllPath))
+
+	// Load the DLL
+	handle, err := syscall.LoadLibrary(string(dllPath))
+	if err != nil {
+		return fmt.Errorf("LoadLibrary failed: %v", err)
+	}
+
+	// Get plugin_get_info function
+	getInfoProc, err := syscall.GetProcAddress(handle, "plugin_get_info")
+	if err != nil {
+		syscall.FreeLibrary(handle)
+		return fmt.Errorf("plugin_get_info not found: %v", err)
+	}
+
+	// Call plugin_get_info to get metadata
+	ret, _, _ := syscall.SyscallN(getInfoProc)
+	if ret == 0 {
+		syscall.FreeLibrary(handle)
+		return fmt.Errorf("plugin_get_info returned NULL")
+	}
+
+	// Parse plugin info (C struct pointer)
+	type CPluginInfo struct {
+		Name     *byte
+		Version  *byte
+		Author   *byte
+		KeyCount uint64
+		Keys     uintptr
+	}
+	cInfo := (*CPluginInfo)(unsafe.Pointer(ret))
+
+	pluginName := cStringToGo(cInfo.Name)
+	pluginVersion := cStringToGo(cInfo.Version)
+	pluginAuthor := cStringToGo(cInfo.Author)
+
+	debugLog(DBG_INFO, fmt.Sprintf("Plugin: %s v%s by %s (%d keys)",
+		pluginName, pluginVersion, pluginAuthor, cInfo.KeyCount))
+
+	// Parse metric keys
+	type CMetricKeyInfo struct {
+		Key                *byte
+		Description        *byte
+		Type               int32
+		Parameters         *byte
+		HasMultipleSources int32
+	}
+
+	keys := make([]MetricKeyInfo, cInfo.KeyCount)
+	for i := uint64(0); i < cInfo.KeyCount; i++ {
+		cKey := (*CMetricKeyInfo)(unsafe.Pointer(cInfo.Keys + uintptr(i)*unsafe.Sizeof(CMetricKeyInfo{})))
+		keys[i] = MetricKeyInfo{
+			Key:                cStringToGo(cKey.Key),
+			Description:        cStringToGo(cKey.Description),
+			Type:               cKey.Type,
+			Parameters:         cStringToGo(cKey.Parameters),
+			HasMultipleSources: cKey.HasMultipleSources,
+		}
+		debugLog(DBG_VERBOSE, fmt.Sprintf("  - %s: %s", keys[i].Key, keys[i].Description))
+	}
+
+	// Get other required functions
+	initProc, err := syscall.GetProcAddress(handle, "plugin_init")
+	if err != nil {
+		syscall.FreeLibrary(handle)
+		return fmt.Errorf("plugin_init not found: %v", err)
+	}
+
+	collectProc, err := syscall.GetProcAddress(handle, "plugin_collect")
+	if err != nil {
+		syscall.FreeLibrary(handle)
+		return fmt.Errorf("plugin_collect not found: %v", err)
+	}
+
+	deinitProc, err := syscall.GetProcAddress(handle, "plugin_deinit")
+	if err != nil {
+		// Optional function
+		deinitProc = 0
+	}
+
+	// Call plugin_init (pass empty config for now)
+	configStr := C.CString("")
+	defer C.free(unsafe.Pointer(configStr))
+	initRet, _, _ := syscall.SyscallN(initProc, uintptr(unsafe.Pointer(configStr)))
+	if initRet != 0 {
+		syscall.FreeLibrary(handle)
+		return fmt.Errorf("plugin_init failed: %d", initRet)
+	}
+
+	// Prime the plugin by calling collect once (for plugins that need baseline)
+	// This is needed for delta-based metrics like CPU load
+	debugLog(DBG_VERBOSE, fmt.Sprintf("Priming plugin %s (initial collect call for baseline)...", pluginName))
+	primeResults := make([]CollectionResult, int(cInfo.KeyCount))
+	syscall.SyscallN(collectProc, uintptr(unsafe.Pointer(&primeResults[0])))
+	// Ignore result - this is just to establish baseline
+
+	// Register each plugin key with the C++ collector
+	for i, keyInfo := range keys {
+		keyName := C.CString(keyInfo.Key)
+		defer C.free(unsafe.Pointer(keyName))
+
+		// Register with plugin registry (this also registers with collector internally)
+		regRet := C.register_measurement_plugin(
+			keyName,
+			unsafe.Pointer(uintptr(handle)),
+			unsafe.Pointer(&collectProc),
+			C.size_t(i),
+		)
+		if regRet != 0 {
+			debugLog(DBG_ERROR, fmt.Sprintf("Failed to register plugin key '%s'", keyInfo.Key))
+			continue
+		}
+		debugLog(DBG_INFO, fmt.Sprintf("Registered plugin key '%s' with collector", keyInfo.Key))
+
+		// Set max samples limit
+		C.collector_set_max_samples(keyName, C.uint(cfgMaxSamples))
+	}
+
+	// Store loaded plugin
+	loaded := LoadedPlugin{
+		DLLPath: dllPath,
+		Handle:  handle,
+		Info: PluginInfo{
+			Name:     pluginName,
+			Version:  pluginVersion,
+			Author:   pluginAuthor,
+			KeyCount: int(cInfo.KeyCount),
+			Keys:     keys,
+		},
+		GetInfoFunc: getInfoProc,
+		InitFunc:    initProc,
+		CollectFunc: collectProc,
+		DeinitFunc:  deinitProc,
+	}
+
+	loadedPlugins = append(loadedPlugins, loaded)
+	debugLog(DBG_INFO, fmt.Sprintf("Successfully loaded plugin: %s", pluginName))
+
+	return nil
+}
+
+// cStringToGo converts a C string pointer to a Go string
+func cStringToGo(cstr *byte) string {
+	if cstr == nil {
+		return ""
+	}
+	return C.GoString((*C.char)(unsafe.Pointer(cstr)))
+}
+
+// unloadAllPlugins unloads all loaded measurement plugins
+func unloadAllPlugins() {
+	// Unregister from C++ plugin registry
+	C.unregister_all_plugins()
+
+	for _, plugin := range loadedPlugins {
+		if plugin.DeinitFunc != 0 {
+			syscall.SyscallN(plugin.DeinitFunc)
+		}
+		syscall.FreeLibrary(plugin.Handle)
+		debugLog(DBG_INFO, fmt.Sprintf("Unloaded plugin: %s", plugin.Info.Name))
+	}
+	loadedPlugins = nil
+}
 
 // Export implements the Exporter interface for metric collection
 func (p *Plugin) Export(key string, params []string, context plugin.ContextProvider) (interface{}, error) {
@@ -176,57 +429,99 @@ func (p *Plugin) Export(key string, params []string, context plugin.ContextProvi
 	}()
 
 	debugLog(DBG_INFO, fmt.Sprintf("EXPORT CALLED: key=%s, params=%v", key, params))
-	switch key {
-	case "aggplugin.test":
+
+	// Handle test metric
+	if key == "aggplugin.test" {
 		debugLog(DBG_VERBOSE, "EXPORT: Handling aggplugin.test")
 		result := "Aggplugin minimal test - plugin loaded successfully!"
 		debugLog(DBG_INFO, fmt.Sprintf("EXPORT: Returning: %s", result))
 		return result, nil
-
-	case "aggplugin.cpu_load":
-		debugLog(DBG_VERBOSE, "EXPORT: Handling aggplugin.cpu_load")
-		// Call C++ collector to fetch and reset aggregated data
-		// Use internal metric name that matches collector registration
-		metricName := C.CString("cpu_load")
-		defer C.free(unsafe.Pointer(metricName))
-
-		buffer := make([]byte, 4096) // Buffer for JSON result
-		ret := C.collector_fetch_and_reset_json(metricName, (*C.char)(unsafe.Pointer(&buffer[0])), C.uint(len(buffer)))
-
-		if ret != 0 {
-			debugLog(DBG_ERROR, fmt.Sprintf("collector_fetch_and_reset_json failed for cpu_load: %d", ret))
-			return nil, fmt.Errorf("failed to fetch cpu_load data: %d", ret)
-		}
-
-		// Find the null terminator and convert to string
-		result := string(buffer[:clen(buffer)])
-		debugLog(DBG_INFO, fmt.Sprintf("EXPORT: Returning CPU load aggregation: %d bytes", len(result)))
-		return result, nil
-
-	case "aggplugin.memory_usage":
-		debugLog(DBG_VERBOSE, "EXPORT: Handling aggplugin.memory_usage")
-		// Call C++ collector to fetch and reset aggregated data
-		// Use internal metric name that matches collector registration
-		metricName := C.CString("mem_free")
-		defer C.free(unsafe.Pointer(metricName))
-
-		buffer := make([]byte, 4096) // Buffer for JSON result
-		ret := C.collector_fetch_and_reset_json(metricName, (*C.char)(unsafe.Pointer(&buffer[0])), C.uint(len(buffer)))
-
-		if ret != 0 {
-			debugLog(DBG_ERROR, fmt.Sprintf("collector_fetch_and_reset_json failed for mem_free: %d", ret))
-			return nil, fmt.Errorf("failed to fetch mem_free data: %d", ret)
-		}
-
-		// Find the null terminator and convert to string
-		result := string(buffer[:clen(buffer)])
-		debugLog(DBG_INFO, fmt.Sprintf("EXPORT: Returning memory usage aggregation: %d bytes", len(result)))
-		return result, nil
-
-	default:
-		debugLog(DBG_ERROR, fmt.Sprintf("EXPORT: Unknown key: %s", key))
-		return nil, fmt.Errorf("unsupported item key: %s", key)
 	}
+
+	// Strip "aggplugin." prefix to get internal collector metric name
+	metricName := strings.TrimPrefix(key, "aggplugin.")
+
+	// For any metric (plugin or built-in), fetch aggregated data from collector
+	debugLog(DBG_VERBOSE, fmt.Sprintf("Fetching aggregated data for metric: %s", metricName))
+
+	cMetricName := C.CString(metricName)
+	defer C.free(unsafe.Pointer(cMetricName))
+
+	buffer := make([]byte, 4096)
+	ret := C.collector_fetch_and_reset_json(cMetricName, (*C.char)(unsafe.Pointer(&buffer[0])), C.uint(len(buffer)))
+
+	if ret != 0 {
+		debugLog(DBG_ERROR, fmt.Sprintf("collector_fetch_and_reset_json failed for %s: %d", metricName, ret))
+		return nil, fmt.Errorf("failed to fetch %s data: %d", metricName, ret)
+	}
+
+	result := string(buffer[:clen(buffer)])
+	debugLog(DBG_INFO, fmt.Sprintf("EXPORT: Returning aggregated data for %s: %d bytes", metricName, len(result)))
+	return result, nil
+}
+
+// callPluginCollect calls a measurement plugin's collect function and formats the result
+func callPluginCollect(plugin *LoadedPlugin, key string, params []string) (interface{}, error) {
+	debugLog(DBG_VERBOSE, fmt.Sprintf("Calling plugin_collect for plugin: %s", plugin.Info.Name))
+
+	// Allocate results array (one per key)
+	results := make([]CollectionResult, plugin.Info.KeyCount)
+	for i := range results {
+		results[i].Key = nil
+		results[i].Status = 0
+		results[i].ValueCount = 0
+		results[i].Values = nil
+	}
+
+	// Call plugin_collect
+	ret, _, _ := syscall.SyscallN(plugin.CollectFunc, uintptr(unsafe.Pointer(&results[0])))
+	if ret == 0 {
+		return nil, fmt.Errorf("plugin_collect returned 0 results")
+	}
+
+	// Find the requested key in results
+	for i := uint64(0); i < uint64(plugin.Info.KeyCount); i++ {
+		resultKey := cStringToGo(results[i].Key)
+		if resultKey == key {
+			if results[i].Status != 0 { // COLLECT_OK = 0
+				return nil, fmt.Errorf("collection failed with status: %d", results[i].Status)
+			}
+
+			// Format result based on value count
+			if results[i].ValueCount == 0 {
+				return nil, fmt.Errorf("no values returned")
+			}
+
+			if results[i].ValueCount == 1 {
+				// Single value - return as float
+				value := (*MeasurementValue)(unsafe.Pointer(results[i].Values))
+				debugLog(DBG_INFO, fmt.Sprintf("Plugin returned single value: %.2f", value.Value))
+				return value.Value, nil
+			} else {
+				// Multiple values - return as JSON
+				jsonParts := []string{fmt.Sprintf(`{"metric":"%s","values":{`, key)}
+
+				values := (*[1024]MeasurementValue)(unsafe.Pointer(results[i].Values))[:results[i].ValueCount:results[i].ValueCount]
+				for j, val := range values {
+					sourceID := cStringToGo(val.SourceID)
+					if sourceID == "" {
+						sourceID = "all"
+					}
+					if j > 0 {
+						jsonParts = append(jsonParts, ",")
+					}
+					jsonParts = append(jsonParts, fmt.Sprintf(`"%s":%.2f`, sourceID, val.Value))
+				}
+				jsonParts = append(jsonParts, "}}")
+
+				result := strings.Join(jsonParts, "")
+				debugLog(DBG_INFO, fmt.Sprintf("Plugin returned %d values: %s", results[i].ValueCount, result))
+				return result, nil
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("key not found in plugin results")
 }
 
 func init() {
@@ -235,7 +530,9 @@ func init() {
 	plugin.RegisterMetrics(&impl, pluginName,
 		"aggplugin.test", "Minimal test metric - returns success message.",
 		"aggplugin.cpu_load", "CPU load aggregation - returns JSON with avg/min/max/med/mod/dev/var/cnt.",
-		"aggplugin.memory_usage", "Memory usage aggregation - returns JSON with avg/min/max/med/mod/dev/var/cnt (MB).",
+		"aggplugin.mem_free", "Available physical memory aggregation - returns JSON with avg/min/max/med/mod/dev/var/cnt (MB).",
+		"aggplugin.disk.io.read[*]", "Disk read operations per second - returns JSON with aggregation statistics (per physical disk).",
+		"aggplugin.disk.io.write[*]", "Disk write operations per second - returns JSON with aggregation statistics (per physical disk).",
 	)
 }
 
@@ -342,6 +639,10 @@ func loadConfig() {
 					cfgPreloadDelay = delay
 					debugLog(DBG_INFO, fmt.Sprintf("Config: PreloadDelay=%.1f (from %s)", delay, configPath))
 				}
+
+			case "Plugins.Aggplugin.PluginPath":
+				cfgPluginPath = value
+				debugLog(DBG_INFO, fmt.Sprintf("Config: PluginPath=%s (from %s)", value, configPath))
 			}
 		}
 
@@ -379,32 +680,17 @@ func main() {
 	C.collector_init(C.double(1.0))
 	debugLog(DBG_INFO, "Collector initialized")
 
-	// Register metrics with collector
-	// NOTE: Use simple names that match plugin_sample_numeric() in plugin_common.cpp
-	debugLog(DBG_INFO, "Registering metrics with collector...")
-	cpuName := C.CString("cpu_load")
-	defer C.free(unsafe.Pointer(cpuName))
-	memName := C.CString("mem_free")
-	defer C.free(unsafe.Pointer(memName))
-
-	retCPU := C.collector_register_metric(cpuName, C.double(1.0))
-	if retCPU != 0 {
-		debugLog(DBG_ERROR, fmt.Sprintf("Failed to register cpu_load metric: %d", retCPU))
-	} else {
-		debugLog(DBG_INFO, "Registered cpu_load with collector (multiplier 1.0)")
+	// Load measurement plugins from DLLs
+	if err := loadMeasurementPlugins(); err != nil {
+		debugLog(DBG_ERROR, fmt.Sprintf("Failed to load measurement plugins: %v", err))
 	}
+	defer unloadAllPlugins()
 
-	retMem := C.collector_register_metric(memName, C.double(1.0))
-	if retMem != 0 {
-		debugLog(DBG_ERROR, fmt.Sprintf("Failed to register mem_free metric: %d", retMem))
-	} else {
-		debugLog(DBG_INFO, "Registered mem_free with collector (multiplier 1.0)")
-	}
+	// NOTE: Plugin metrics are now registered by loadMeasurementPlugins()
+	// Built-in metrics (cpu_load, mem_free) are now provided by plugins if loaded
+	// If no plugins, the collector will use the fallback built-in implementations
 
-	// Set max samples limit for both metrics
-	debugLog(DBG_INFO, fmt.Sprintf("Setting max samples limit: %d", cfgMaxSamples))
-	C.collector_set_max_samples(cpuName, C.uint(cfgMaxSamples))
-	C.collector_set_max_samples(memName, C.uint(cfgMaxSamples))
+	debugLog(DBG_INFO, "Metrics registered, collector sampling started")
 
 	// PRELOAD: Wait for baseline establishment before accepting queries
 	// Windows sampling requires TWO calls: first establishes baseline, second returns data
@@ -449,6 +735,7 @@ func main() {
 	debugLog(DBG_VERBOSE, "Checking environment before Execute()...")
 	debugLog(DBG_VVERBOSE, fmt.Sprintf("Command line args: %v", os.Args))
 	debugLog(DBG_VVERBOSE, fmt.Sprintf("Working directory: %s", func() string { wd, _ := os.Getwd(); return wd }()))
+	debugLog(DBG_VVERBOSE, fmt.Sprintf("Environment: ZABBIX_PLUGIN_SOCKET=%s", os.Getenv("ZABBIX_PLUGIN_SOCKET")))
 
 	// List named pipes
 	debugLog(DBG_VVERBOSE, "Checking named pipes:")

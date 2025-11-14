@@ -1,0 +1,475 @@
+/*
+ * plugin_loader.cpp - Dynamic Plugin Loading System
+ * Zabbix Aggplugin v0.1 (tmp0.1) | November 14, 2025
+ * Author: Claude Sonnet 4.5 (AI Assistant) | Lead & Architecture: lukas@plachy.eu
+ *
+ * PURPOSE:
+ *   Implements dynamic loading of measurement plugins from DLL files.
+ *   Scans configured plugin directory, loads plugins, validates API,
+ *   and manages plugin lifecycle.
+ *
+ * FEATURES:
+ *   - Wildcard-based plugin discovery (e.g., plugins/measurements/*.dll)
+ *   - Configuration section parsing per plugin
+ *   - Plugin validation (required functions present)
+ *   - Error handling and logging
+ *   - Thread-safe plugin collection
+ *
+ * INTEGRATION:
+ *   - Called by collector.cpp during initialization
+ *   - Each loaded plugin gets its own section in aggplugin.conf
+ *   - Plugin keys are registered with main collector
+ */
+
+#include "measurement_plugin_api.h"
+#include <windows.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <vector>
+#include <string>
+#include <algorithm>
+#include <sstream>
+
+// Forward declarations for convenience functions
+std::vector<std::pair<std::string, std::string>> 
+parse_plugin_config_sections(const std::string& config_text);
+
+/* ========================================================================
+ * PLUGIN HANDLE STRUCTURE (opaque in API, defined here)
+ * ======================================================================== */
+
+struct plugin_handle_s {
+    HMODULE dll_handle;
+    std::string dll_path;
+    std::string name;
+    
+    // Required function pointers
+    plugin_get_info_func get_info;
+    plugin_init_func init;
+    plugin_collect_func collect;
+    plugin_deinit_func deinit;
+    
+    // Optional function pointers (may be NULL)
+    plugin_on_reset_func on_reset;
+    plugin_aggregate_custom_func aggregate_custom;
+    plugin_on_init_complete_func on_init_complete;
+    
+    // Cached plugin info
+    const plugin_info_t* info;
+    bool initialized;
+};
+
+/* ========================================================================
+ * GLOBAL PLUGIN REGISTRY
+ * ======================================================================== */
+
+static std::vector<plugin_handle_t*> loaded_plugins;
+static bool plugins_initialized = false;
+
+/* ========================================================================
+ * HELPER FUNCTIONS
+ * ======================================================================== */
+
+/**
+ * Expand wildcard path and return list of matching files
+ * 
+ * Example: "plugins/measurements/*.dll" -> ["plugins/measurements/disk.dll", ...]
+ */
+static std::vector<std::string> expand_wildcard_path(const char* pattern) {
+    std::vector<std::string> results;
+    
+    // Extract directory and filename pattern
+    std::string path_str(pattern);
+    size_t last_slash = path_str.find_last_of("\\/");
+    std::string dir_path = (last_slash != std::string::npos) 
+        ? path_str.substr(0, last_slash) 
+        : ".";
+    std::string file_pattern = (last_slash != std::string::npos)
+        ? path_str.substr(last_slash + 1)
+        : path_str;
+    
+    // Search for matching files
+    WIN32_FIND_DATAA find_data;
+    HANDLE find_handle = FindFirstFileA(pattern, &find_data);
+    
+    if (find_handle == INVALID_HANDLE_VALUE) {
+        return results;  // No matches
+    }
+    
+    do {
+        if (!(find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
+            std::string full_path = dir_path + "\\" + find_data.cFileName;
+            results.push_back(full_path);
+        }
+    } while (FindNextFileA(find_handle, &find_data));
+    
+    FindClose(find_handle);
+    return results;
+}
+
+/**
+ * Load function pointer from DLL with error logging
+ */
+template<typename FuncPtr>
+static bool load_function(HMODULE dll, const char* func_name, FuncPtr& func_ptr, bool required) {
+    func_ptr = (FuncPtr)GetProcAddress(dll, func_name);
+    
+    if (!func_ptr && required) {
+        fprintf(stderr, "PluginLoader: Missing required function '%s'\n", func_name);
+        return false;
+    }
+    
+    return true;
+}
+
+/* ========================================================================
+ * PLUGIN LOADING API IMPLEMENTATION
+ * ======================================================================== */
+
+/**
+ * Load plugin from DLL file
+ * 
+ * PARAMETERS:
+ *   dll_path: Path to plugin DLL
+ *   config_section: Configuration string for this plugin
+ * RETURN: Plugin handle on success, NULL on failure
+ */
+plugin_handle_t* plugin_load(const char* dll_path, const char* config_section) {
+    if (!dll_path) {
+        fprintf(stderr, "PluginLoader: NULL dll_path provided\n");
+        return nullptr;
+    }
+    
+    printf("PluginLoader: Loading plugin from '%s'\n", dll_path);
+    
+    // Load DLL
+    HMODULE dll = LoadLibraryA(dll_path);
+    if (!dll) {
+        DWORD error = GetLastError();
+        fprintf(stderr, "PluginLoader: Failed to load DLL '%s' (error %lu)\n", 
+                dll_path, error);
+        return nullptr;
+    }
+    
+    // Allocate plugin handle
+    plugin_handle_t* handle = new plugin_handle_t;
+    memset(handle, 0, sizeof(plugin_handle_t));
+    handle->dll_handle = dll;
+    handle->dll_path = dll_path;
+    handle->initialized = false;
+    
+    // Load required functions
+    if (!load_function(dll, "plugin_get_info", handle->get_info, true) ||
+        !load_function(dll, "plugin_init", handle->init, true) ||
+        !load_function(dll, "plugin_collect", handle->collect, true) ||
+        !load_function(dll, "plugin_deinit", handle->deinit, true)) {
+        fprintf(stderr, "PluginLoader: Plugin '%s' missing required functions\n", dll_path);
+        FreeLibrary(dll);
+        delete handle;
+        return nullptr;
+    }
+    
+    // Load optional functions (no error if missing)
+    load_function(dll, "plugin_on_reset", handle->on_reset, false);
+    load_function(dll, "plugin_aggregate_custom", handle->aggregate_custom, false);
+    load_function(dll, "plugin_on_init_complete", handle->on_init_complete, false);
+    
+    // Get plugin info
+    handle->info = handle->get_info();
+    if (!handle->info) {
+        fprintf(stderr, "PluginLoader: plugin_get_info() returned NULL for '%s'\n", dll_path);
+        FreeLibrary(dll);
+        delete handle;
+        return nullptr;
+    }
+    
+    handle->name = handle->info->name;
+    printf("PluginLoader: Loaded plugin '%s' v%s by %s\n",
+           handle->info->name, handle->info->version, handle->info->author);
+    printf("PluginLoader:   Exposes %zu metric key(s)\n", handle->info->key_count);
+    
+    // Initialize plugin
+    int init_result = handle->init(config_section ? config_section : "");
+    if (init_result != 0) {
+        fprintf(stderr, "PluginLoader: plugin_init() failed for '%s' (returned %d)\n",
+                dll_path, init_result);
+        FreeLibrary(dll);
+        delete handle;
+        return nullptr;
+    }
+    
+    handle->initialized = true;
+    
+    // Add to global registry
+    loaded_plugins.push_back(handle);
+    
+    return handle;
+}
+
+/**
+ * Unload plugin and free resources
+ */
+void plugin_unload(plugin_handle_t* handle) {
+    if (!handle) {
+        return;
+    }
+    
+    printf("PluginLoader: Unloading plugin '%s'\n", handle->name.c_str());
+    
+    // Call plugin deinit
+    if (handle->initialized && handle->deinit) {
+        int result = handle->deinit();
+        if (result != 0) {
+            fprintf(stderr, "PluginLoader: plugin_deinit() returned error %d for '%s'\n",
+                    result, handle->name.c_str());
+        }
+    }
+    
+    // Unload DLL
+    if (handle->dll_handle) {
+        FreeLibrary(handle->dll_handle);
+    }
+    
+    // Remove from registry
+    auto it = std::find(loaded_plugins.begin(), loaded_plugins.end(), handle);
+    if (it != loaded_plugins.end()) {
+        loaded_plugins.erase(it);
+    }
+    
+    delete handle;
+}
+
+/**
+ * Get plugin info from loaded plugin
+ */
+const plugin_info_t* plugin_get_info_loaded(plugin_handle_t* handle) {
+    return handle ? handle->info : nullptr;
+}
+
+/**
+ * Collect measurements from loaded plugin
+ */
+size_t plugin_collect_loaded(plugin_handle_t* handle, collection_result_t* results) {
+    if (!handle || !handle->initialized || !handle->collect) {
+        return 0;
+    }
+    
+    return handle->collect(results);
+}
+
+/* ========================================================================
+ * PLUGIN DISCOVERY AND BATCH LOADING
+ * ======================================================================== */
+
+/**
+ * Discover and load all plugins from directory pattern
+ * 
+ * PARAMETERS:
+ *   plugin_path_pattern: Wildcard pattern (e.g., "plugins/*.dll")
+ *   config_map: Map of plugin name -> config section string
+ * RETURN: Number of successfully loaded plugins
+ * 
+ * NOTES:
+ *   - Scans directory for DLLs matching pattern
+ *   - Loads each DLL and validates API
+ *   - Calls plugin_init() for each plugin with its config section
+ *   - Registers all plugin keys with collector
+ */
+int plugin_discover_and_load(
+    const char* plugin_path_pattern,
+    const std::vector<std::pair<std::string, std::string>>& config_map) 
+{
+    printf("PluginLoader: Discovering plugins matching '%s'\n", plugin_path_pattern);
+    
+    // Expand wildcard pattern
+    std::vector<std::string> dll_files = expand_wildcard_path(plugin_path_pattern);
+    
+    if (dll_files.empty()) {
+        printf("PluginLoader: No plugin DLLs found matching pattern\n");
+        return 0;
+    }
+    
+    printf("PluginLoader: Found %zu plugin DLL(s)\n", dll_files.size());
+    
+    int loaded_count = 0;
+    
+    // Load each plugin
+    for (const auto& dll_path : dll_files) {
+        // Extract plugin name from filename (without extension)
+        size_t last_slash = dll_path.find_last_of("\\/");
+        size_t last_dot = dll_path.find_last_of('.');
+        std::string plugin_filename = dll_path.substr(
+            last_slash != std::string::npos ? last_slash + 1 : 0,
+            last_dot != std::string::npos ? last_dot - (last_slash + 1) : std::string::npos);
+        
+        // Find config section for this plugin
+        const char* config_section = nullptr;
+        for (const auto& config_entry : config_map) {
+            if (config_entry.first == plugin_filename) {
+                config_section = config_entry.second.c_str();
+                break;
+            }
+        }
+        
+        // Load plugin
+        plugin_handle_t* handle = plugin_load(dll_path.c_str(), config_section);
+        if (handle) {
+            loaded_count++;
+        }
+    }
+    
+    // Call on_init_complete for all plugins
+    for (auto* handle : loaded_plugins) {
+        if (handle->on_init_complete) {
+            handle->on_init_complete();
+        }
+    }
+    
+    plugins_initialized = true;
+    
+    printf("PluginLoader: Successfully loaded %d/%zu plugins\n", 
+           loaded_count, dll_files.size());
+    
+    return loaded_count;
+}
+
+/**
+ * Unload all plugins
+ */
+void plugin_unload_all() {
+    printf("PluginLoader: Unloading all plugins\n");
+    
+    // Unload in reverse order
+    while (!loaded_plugins.empty()) {
+        plugin_unload(loaded_plugins.back());
+    }
+    
+    plugins_initialized = false;
+}
+
+/**
+ * Get list of all loaded plugins
+ */
+const std::vector<plugin_handle_t*>& plugin_get_all_loaded() {
+    return loaded_plugins;
+}
+
+/**
+ * Collect measurements from all plugins
+ * 
+ * PARAMETERS:
+ *   all_results: Output vector to receive all collection results
+ * RETURN: Total number of metrics collected
+ * 
+ * NOTES:
+ *   - Calls plugin_collect() for each loaded plugin
+ *   - Aggregates results into single vector
+ *   - Caller is responsible for freeing values arrays
+ */
+size_t plugin_collect_all(std::vector<collection_result_t>& all_results) {
+    size_t total_count = 0;
+    
+    for (auto* handle : loaded_plugins) {
+        if (!handle->initialized || !handle->info) {
+            continue;
+        }
+        
+        // Allocate results array for this plugin
+        size_t key_count = handle->info->key_count;
+        collection_result_t* results = new collection_result_t[key_count];
+        memset(results, 0, sizeof(collection_result_t) * key_count);
+        
+        // Collect measurements
+        size_t count = plugin_collect_loaded(handle, results);
+        
+        // Add to output vector
+        for (size_t i = 0; i < count; i++) {
+            all_results.push_back(results[i]);
+        }
+        
+        total_count += count;
+        delete[] results;
+    }
+    
+    return total_count;
+}
+
+/**
+ * Call on_reset callback for all plugins (when aggregated data is fetched)
+ */
+void plugin_notify_reset(const char* key) {
+    for (auto* handle : loaded_plugins) {
+        if (handle->on_reset) {
+            handle->on_reset(key);
+        }
+    }
+}
+
+/* ========================================================================
+ * CONFIGURATION PARSER FOR PLUGIN SECTIONS
+ * ======================================================================== */
+
+/**
+ * Parse plugin configuration from string
+ * 
+ * Format: Multi-line key=value pairs
+ * Example:
+ *   enabled=1
+ *   devices=0,1,2
+ *   interval=2.0
+ * 
+ * Returns: Map of section name -> config string
+ */
+std::vector<std::pair<std::string, std::string>> 
+parse_plugin_config_sections(const std::string& config_text) {
+    std::vector<std::pair<std::string, std::string>> sections;
+    
+    std::istringstream stream(config_text);
+    std::string line;
+    std::string current_section;
+    std::ostringstream current_content;
+    
+    while (std::getline(stream, line)) {
+        // Trim whitespace
+        size_t start = line.find_first_not_of(" \t\r\n");
+        size_t end = line.find_last_not_of(" \t\r\n");
+        
+        if (start == std::string::npos) {
+            continue; // Empty line
+        }
+        
+        line = line.substr(start, end - start + 1);
+        
+        // Check for section header: [plugin.name]
+        if (line[0] == '[' && line[line.size() - 1] == ']') {
+            // Save previous section
+            if (!current_section.empty()) {
+                sections.push_back({current_section, current_content.str()});
+                current_content.str("");
+                current_content.clear();
+            }
+            
+            // Extract section name (remove [plugin. prefix and ] suffix)
+            std::string section_header = line.substr(1, line.size() - 2);
+            if (section_header.substr(0, 7) == "plugin.") {
+                current_section = section_header.substr(7);
+            } else {
+                current_section.clear();
+            }
+        } else if (!current_section.empty()) {
+            // Add line to current section content
+            if (current_content.tellp() > 0) {
+                current_content << "\n";
+            }
+            current_content << line;
+        }
+    }
+    
+    // Save last section
+    if (!current_section.empty()) {
+        sections.push_back({current_section, current_content.str()});
+    }
+    
+    return sections;
+}

@@ -52,6 +52,40 @@
 #include <cstring>               // std::memcpy (not used directly, but may be required by other headers)
 #include <vector>                // std::vector<double> - store all samples for median/mode
 #include <algorithm>             // std::sort - median computation requires sorted values
+#include <cstdio>                // fprintf - debugging output
+#include <ctime>                 // time(), localtime() - timestamps for logging
+#include <cstdarg>               // va_list, va_start, va_end - variadic function support
+
+// Debug logging (write to file since stderr is not available when running as Windows Service)
+static FILE* debug_log = nullptr;
+static std::mutex debug_log_mutex;
+
+void log_debug(const char* fmt, ...) {
+    std::lock_guard<std::mutex> lk(debug_log_mutex);
+    if (!debug_log) {
+        debug_log = fopen("C:\\Zabbix\\log\\collector_debug.log", "a");
+        if (!debug_log) return;
+    }
+    
+    // Timestamp
+    time_t now = time(nullptr);
+    struct tm* tm_now = localtime(&now);
+    fprintf(debug_log, "[%04d-%02d-%02d %02d:%02d:%02d] [COLLECTOR] ",
+            tm_now->tm_year + 1900, tm_now->tm_mon + 1, tm_now->tm_mday,
+            tm_now->tm_hour, tm_now->tm_min, tm_now->tm_sec);
+    
+    // Message
+    va_list args;
+    va_start(args, fmt);
+    vfprintf(debug_log, fmt, args);
+    va_end(args);
+    fprintf(debug_log, "\n");
+    fflush(debug_log);
+}
+#include <cmath>                 // std::sqrt, std::llround - statistics computation
+#include <cstring>               // std::memcpy (not used directly, but may be required by other headers)
+#include <vector>                // std::vector<double> - store all samples for median/mode
+#include <algorithm>             // std::sort - median computation requires sorted values
 
 /*
  * struct Accumulator - Thread-safe sample accumulator for a single metric
@@ -384,8 +418,12 @@ static double base_interval = 1.0;
  */
 void collector_loop() {
     uint64_t tick = 0;
+    log_debug("Thread started, base_interval=%.1fs, running=%d", base_interval, running.load());
     while (running.load()) {
         tick++;
+        if (tick % 5 == 1) {
+            log_debug("Tick %llu, checking %zu metrics, running=%d", (unsigned long long)tick, metrics.size(), running.load());
+        }
         {
             std::lock_guard<std::mutex> lk(metrics_m);
             for (auto &kv : metrics) {
@@ -394,13 +432,21 @@ void collector_loop() {
                     // sample
                     int ok = 0;
                     double v = plugin_sample_numeric(kv.first.c_str(), &ok);
-                    if (ok) me.acc.add(v);
+                    if (ok) {
+                        me.acc.add(v);
+                        log_debug("Sampled %s=%.2f", kv.first.c_str(), v);
+                    } else {
+                        log_debug("ERROR: Failed to sample %s", kv.first.c_str());
+                    }
                     me.next_tick += me.multiplicator;
                 }
             }
         }
+        log_debug("About to sleep for %.1fs (tick %llu)", base_interval, (unsigned long long)tick);
         std::this_thread::sleep_for(std::chrono::duration<double>(base_interval));
+        log_debug("Woke up from sleep (tick %llu), running=%d", (unsigned long long)tick, running.load());
     }
+    log_debug("Thread exiting (running=%d)", running.load());
 }
 
 // API FUNCTION IMPLEMENTATIONS:
@@ -461,11 +507,13 @@ extern "C" void collector_stop() {
  */
 extern "C" int collector_register_metric(const char *name, double multiplicator) {
     if (!name) return 1;
+    log_debug("Registering metric: %s (multiplicator=%.2f)", name, multiplicator);
     std::lock_guard<std::mutex> lk(metrics_m);
     std::string s(name);
     MetricEntry &me = metrics[s];
     me.multiplicator = multiplicator;
     me.next_tick = 1.0; // Start sampling on first tick
+    log_debug("Metric registered: %s (total metrics now: %zu)", name, metrics.size());
     return 0;
 }
 

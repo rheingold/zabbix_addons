@@ -30,6 +30,8 @@ Aggregated Metrics Plugin for Zabbix
 
 High-performance Windows metrics aggregation plugin for Zabbix Agent2. Continuously samples system metrics (CPU, memory) and computes comprehensive statistics including average, min/max, median, mode, standard deviation, and variance. Built with C++ for performance and Go for Agent2 integration.
 
+**NEW in 0.1 (tmp0.1)**: 🎉 **Plugin Framework** - Extend aggplugin with loadable measurement plugins! Add custom metrics by dropping DLLs into a directory. See [PLUGIN_DEVELOPMENT.md](PLUGIN_DEVELOPMENT.md) for details.
+
 ---
 
 ## Quick Start for Zabbix Administrators
@@ -40,7 +42,10 @@ The Aggplugin continuously monitors your system metrics in the background and pr
 
 - **CPU Load**: Average, minimum, maximum, median, mode, standard deviation over time
 - **Memory Usage**: Same comprehensive statistics for available memory
+- **Extensible**: Add custom metrics via loadable plugins (DLL files)
 - **JSON Output**: All statistics returned in a single metric query
+
+**NEW:** Built-in CPU and memory metrics are now also available as **example plugins** (`cpu_load_plugin.dll`, `memory_usage_plugin.dll`), demonstrating the plugin framework!
 
 ### Installation Steps
 

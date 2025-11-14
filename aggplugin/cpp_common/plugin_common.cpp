@@ -54,6 +54,7 @@
 // INCLUDE DOCUMENTATION:
 
 #include "plugin_common.hpp"  // API declarations for metric sampling functions
+#include "plugin_loader.hpp"  // Plugin registry for dynamically loaded DLLs
 
 // C++ Standard Library includes:
 #include <string>             // std::string - metric name comparison
@@ -338,6 +339,14 @@ static bool sample_mem_free_mb(double &out_mb)
 extern "C" double plugin_sample_numeric(const char *metric, int *ok) {
     *ok = 0; // Default: failure
     if (!metric) return 0.0;
+    
+    // FIRST: Check if this metric is provided by a loaded plugin DLL
+    double plugin_value = plugin_sample_from_dll(metric, ok);
+    if (*ok) {
+        return plugin_value;  // Plugin handled it successfully
+    }
+    
+    // FALLBACK: Use built-in metric implementations
     std::string m(metric);
 
 #ifdef _WIN32
