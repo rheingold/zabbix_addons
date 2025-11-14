@@ -99,6 +99,8 @@ window.widget_form = new class extends CWidgetForm {
 				const selectedSet = this._color_set.value;
 				if (selectedSet && this._color_sets[selectedSet]) {
 					this._graph_colors.value = this._color_sets[selectedSet];
+					// Trigger change event to notify Zabbix form of the update
+					this._graph_colors.dispatchEvent(new Event('change', { bubbles: true }));
 				}
 			});
 		}
