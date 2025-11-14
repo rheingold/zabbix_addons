@@ -6,9 +6,9 @@
 ║                       MULTIGRAPH WIDGET                                    ║
 ║                  Enhanced Zabbix Graph Visualization                      ║
 ║                                                                           ║
-║  Version:          0.1.0 (Development - Untested for Classic Client)     ║
+║  Version:          0.1.7 (Development - Pattern Builder Added)           ║
 ║  Created:          November 5, 2025                                       ║
-║  Last Updated:     November 10, 2025                                      ║
+║  Last Updated:     November 14, 2025                                      ║
 ║                                                                           ║
 ║  Lead & Architecture:  lukas@plachy.eu                                    ║
 ║  Development:          Claude Sonnet 4 (AI Assistant, Anthropic)          ║
@@ -496,7 +496,26 @@ Dashboard Load → WidgetView → MatchedItemsData → API::Item
 
 ### Version History
 
-**v0.1.0 (2025-11-10) - Current Development Version**
+**v0.1.7 (2025-11-14) - Pattern Builder UI**
+- Added interactive Pattern Builder button next to item_pattern field
+- Created ItemList.php AJAX endpoint for fetching items and item prototypes
+- Built modal UI showing items with {#MACROS} for easy selection
+- Auto-converts {#MACROS} to wildcards (*) or regex (.+) based on pattern mode
+- Supports both regular items and LLD item prototypes
+- Validates host selection before showing item list
+- Click any item to auto-fill pattern field with macro conversion
+
+**v0.1.6 (2025-11-13) - Named Color Sets**
+- Added predefined color palette dropdown (Material, Pastel, Vibrant, Earth, etc.)
+- Integer-based color set keys for efficient storage
+- Auto-population of graph_colors field on selection
+- 8 professional color schemes included
+
+**v0.1.5 (2025-11-12) - Module Rescan Action**
+- Added rescan action for clearing Zabbix module cache
+- Enables hot-reload without restarting web server
+
+**v0.1.0 (2025-11-10) - Initial Release**
 - Initial implementation
 - Core functionality complete
 - Documentation complete
