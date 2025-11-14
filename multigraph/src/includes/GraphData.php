@@ -193,7 +193,12 @@ class GraphData {
 			'grid_density' => $config['grid_density'] ?? 'auto',
 			'text_color_legend' => $config['text_color_legend'] ?? '#000000',
 			'text_color_xaxis' => $config['text_color_xaxis'] ?? '#000000',
-			'text_color_yaxis' => $config['text_color_yaxis'] ?? '#000000'
+			'text_color_yaxis' => $config['text_color_yaxis'] ?? '#000000',
+			'missing_data' => $config['missing_data'] ?? 1,
+			'graph_type' => $config['graph_type'] ?? 0,
+			'bar_separation' => $config['bar_separation'] ?? 5,
+			'bar_display_mode' => $config['bar_display_mode'] ?? 0,
+			'distribution_bins' => $config['distribution_bins'] ?? 10
 		];
 	}
 

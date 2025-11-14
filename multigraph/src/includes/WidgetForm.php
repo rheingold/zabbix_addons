@@ -42,6 +42,7 @@ use Zabbix\Widgets\{ // Zabbix widget framework base classes
 
 use Zabbix\Widgets\Fields\{ // Zabbix widget field types
 	CWidgetFieldCheckBox,          // Boolean checkbox fields
+	CWidgetFieldIntegerBox,        // Integer input with min/max validation
 	CWidgetFieldMultiSelectHost,   // Host picker with multi-selection
 	CWidgetFieldRadioButtonList,   // Radio button group selection
 	CWidgetFieldTextBox,            // Single-line text input
@@ -87,6 +88,54 @@ class WidgetForm extends CWidgetForm {
 	 * @const int Used in color_mode RadioButtonList
 	 */
 	public const COLOR_MODE_OFFSET = 2;
+
+	/**
+	 * Missing data: Leave gaps (don't draw line)
+	 * @const int Used in missing_data RadioButtonList
+	 */
+	public const MISSING_DATA_NONE = 0;
+	
+	/**
+	 * Missing data: Connect across gaps
+	 * @const int Used in missing_data RadioButtonList
+	 */
+	public const MISSING_DATA_CONNECTED = 1;
+	
+	/**
+	 * Missing data: Treat as zero value
+	 * @const int Used in missing_data RadioButtonList
+	 */
+	public const MISSING_DATA_ZERO = 2;
+
+	/**
+	 * Graph type: Line chart
+	 * @const int Used in graph_type RadioButtonList
+	 */
+	public const GRAPH_TYPE_LINE = 0;
+	
+	/**
+	 * Graph type: Bar chart
+	 * @const int Used in graph_type RadioButtonList
+	 */
+	public const GRAPH_TYPE_BAR = 1;
+	
+	/**
+	 * Graph type: Distribution/Histogram
+	 * @const int Used in graph_type RadioButtonList
+	 */
+	public const GRAPH_TYPE_DISTRIBUTION = 2;
+
+	/**
+	 * Bar display mode: Grouped (side-by-side)
+	 * @const int Used in bar_display_mode RadioButtonList
+	 */
+	public const BAR_DISPLAY_GROUPED = 0;
+
+	/**
+	 * Bar display mode: Stacked
+	 * @const int Used in bar_display_mode RadioButtonList
+	 */
+	public const BAR_DISPLAY_STACKED = 1;
 
 	/**
 	 * Legend position: Top-left corner
@@ -144,6 +193,11 @@ class WidgetForm extends CWidgetForm {
 			->addField(
 				(new CWidgetFieldMultiSelectHost('hostids', _('Host')))
 					->setMultiple(false)
+					->setDefault([
+						CWidgetField::FOREIGN_REFERENCE_KEY => CWidgetField::createTypedReference(
+							CWidgetField::REFERENCE_DASHBOARD, CWidgetsData::DATA_TYPE_HOST_ID
+						)
+					])
 			)
 			->addField(
 				(new CWidgetFieldTextBox('item_pattern', _('Item pattern')))
@@ -167,6 +221,37 @@ class WidgetForm extends CWidgetForm {
 					])
 					->setDefaultPeriod(['from' => 'now-1h', 'to' => 'now'])
 					->setFlags(CWidgetField::FLAG_NOT_EMPTY | CWidgetField::FLAG_LABEL_ASTERISK)
+			)
+			->addField(
+				(new CWidgetFieldRadioButtonList('missing_data', _('Missing data'), [
+					self::MISSING_DATA_NONE => _('None'),
+					self::MISSING_DATA_CONNECTED => _('Connected'),
+					self::MISSING_DATA_ZERO => _('Treat as 0')
+				]))
+					->setDefault(self::MISSING_DATA_CONNECTED)
+			)
+			->addField(
+				(new CWidgetFieldRadioButtonList('graph_type', _('Graph type'), [
+					self::GRAPH_TYPE_LINE => _('Line'),
+					self::GRAPH_TYPE_BAR => _('Bar'),
+					self::GRAPH_TYPE_DISTRIBUTION => _('Distribution')
+				]))
+					->setDefault(self::GRAPH_TYPE_LINE)
+			)
+			->addField(
+				(new CWidgetFieldIntegerBox('bar_separation', _('Bar separation (px)')))
+					->setDefault(5)
+			)
+			->addField(
+				(new CWidgetFieldRadioButtonList('bar_display_mode', _('Bar display mode'), [
+					self::BAR_DISPLAY_GROUPED => _('Grouped'),
+					self::BAR_DISPLAY_STACKED => _('Stacked')
+				]))
+					->setDefault(self::BAR_DISPLAY_GROUPED)
+			)
+			->addField(
+				(new CWidgetFieldIntegerBox('distribution_bins', _('Number of bins')))
+					->setDefault(10)
 			)
 			->addField(
 				(new CWidgetFieldCheckBox('show_legend', _('Show legend')))->setDefault(1)

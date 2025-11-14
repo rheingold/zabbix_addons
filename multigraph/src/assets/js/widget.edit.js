@@ -63,11 +63,49 @@ window.widget_form = new class extends CWidgetForm {
 		this._form = this.getForm();                                   // Get form DOM element
 		this._item_pattern = document.getElementById('item_pattern'); // Item pattern text field
 		this._pattern_mode = document.getElementById('pattern_mode'); // Pattern mode radio buttons
+		this._graph_type = document.getElementById('graph_type');     // Graph type radio buttons
+		
+		const barSeparationField = document.getElementById('bar_separation');
+		this._bar_separation_row = barSeparationField ? barSeparationField.closest('.form-field') : null;
+		
+		const barDisplayModeField = document.getElementById('bar_display_mode');
+		this._bar_display_mode_row = barDisplayModeField ? barDisplayModeField.closest('.form-field') : null;
+		
+		const distributionBinsField = document.getElementById('distribution_bins');
+		this._distribution_bins_row = distributionBinsField ? distributionBinsField.closest('.form-field') : null;
 		
 		console.log('Item pattern field:', this._item_pattern);
 		
 		// Add pattern builder button (currently disabled)
 		this.addPatternBuilderButton();
+		
+		// Setup graph type change handler for conditional field visibility
+		if (this._graph_type && (this._bar_separation_row || this._bar_display_mode_row || this._distribution_bins_row)) {
+			const updateGraphTypeFields = () => {
+				const graphType = document.querySelector('input[name="graph_type"]:checked')?.value;
+				
+				// Show bar_separation and bar_display_mode only for Bar chart (type 1)
+				if (this._bar_separation_row) {
+					this._bar_separation_row.style.display = (graphType === '1') ? '' : 'none';
+				}
+				if (this._bar_display_mode_row) {
+					this._bar_display_mode_row.style.display = (graphType === '1') ? '' : 'none';
+				}
+				
+				// Show distribution_bins only for Distribution chart (type 2)
+				if (this._distribution_bins_row) {
+					this._distribution_bins_row.style.display = (graphType === '2') ? '' : 'none';
+				}
+			};
+			
+			// Initial visibility
+			updateGraphTypeFields();
+			
+			// Update on change
+			document.querySelectorAll('input[name="graph_type"]').forEach(radio => {
+				radio.addEventListener('change', updateGraphTypeFields);
+			});
+		}
 		
 		this.ready(); // Signal form ready to Zabbix framework
 	}

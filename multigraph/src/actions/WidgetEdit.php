@@ -86,9 +86,12 @@ class WidgetEdit extends CControllerDashboardWidgetEdit {
 			$fields['color_mode'] = $color_mode_field;
 		}
 
-		$this->setResponse(new CControllerResponseData([
+		// Pass context to view for conditional field display
+		$response_data = [
 			'name' => $this->getInput('name', $this->widget->getDefaultName()),
 			'fields' => $fields
-		]));
+		];
+		
+		$this->setResponse(new CControllerResponseData($response_data));
 	}
 }

@@ -56,12 +56,31 @@
 $form = new CWidgetFormView($data);
 
 // === REQUIRED FIELDS ===
+
+// Always show hostids field - FOREIGN_REFERENCE_KEY will auto-fill from dashboard when left empty
+$form->addField(new CWidgetFieldMultiSelectHostView($data['fields']['hostids']));
+
 $form
-	->addField(new CWidgetFieldMultiSelectHostView($data['fields']['hostids']))     // Host selector
 	->addField(new CWidgetFieldTextBoxView($data['fields']['item_pattern']))        // Item name pattern
 	->addField(new CWidgetFieldRadioButtonListView($data['fields']['pattern_mode'])) // Wildcard/Regex
 	->addField(new CWidgetFieldTimePeriodView($data['fields']['time_period']))      // Time range
+	->addField(new CWidgetFieldRadioButtonListView($data['fields']['missing_data'])) // Missing data handling
+	->addField(new CWidgetFieldRadioButtonListView($data['fields']['graph_type']))  // Graph type (line/bar)
 	->addField(new CWidgetFieldCheckBoxView($data['fields']['show_legend']));       // Show/hide legend
+
+// === OPTIONAL FIELDS: Bar Chart Configuration ===
+if (isset($data['fields']['bar_separation'])) {
+	$form->addField(new CWidgetFieldIntegerBoxView($data['fields']['bar_separation'])); // Bar separation (only for bar chart)
+}
+
+if (isset($data['fields']['bar_display_mode'])) {
+	$form->addField(new CWidgetFieldRadioButtonListView($data['fields']['bar_display_mode'])); // Grouped or stacked (only for bar chart)
+}
+
+// === OPTIONAL FIELDS: Distribution Configuration ===
+if (isset($data['fields']['distribution_bins'])) {
+	$form->addField(new CWidgetFieldIntegerBoxView($data['fields']['distribution_bins'])); // Number of bins (only for distribution)
+}
 
 // === OPTIONAL FIELDS: Legend Configuration ===
 if (isset($data['fields']['legend_position'])) {

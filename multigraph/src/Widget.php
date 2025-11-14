@@ -27,6 +27,7 @@
 namespace Widgets\Multigraph;
 
 use Zabbix\Core\CWidget; // Zabbix base widget class providing framework integration
+use CWidgetsData; // Dashboard data types (DATA_TYPE_HOST_ID)
 
 /**
  * Multigraph Widget - Main widget class
@@ -54,5 +55,22 @@ class Widget extends CWidget {
 	 */
 	public function getDefaultName(): string {
 		return self::DEFAULT_NAME;
+	}
+
+	/**
+	 * Declare dashboard inputs that this widget accepts
+	 * 
+	 * This tells Zabbix dashboard to pass host context from template dashboards
+	 * applied to hosts, enabling the widget to show data for the current host.
+	 * 
+	 * CRITICAL: Without this, template dashboards cannot pass hostid to widget,
+	 * causing configured host to always take precedence.
+	 * 
+	 * @return array Dashboard data types this widget accepts as input
+	 */
+	public function getIn(): array {
+		return [
+			CWidgetsData::DATA_TYPE_HOST_ID // Accept host ID from dashboard context
+		];
 	}
 }

@@ -64,7 +64,10 @@ class WidgetView extends CControllerDashboardWidgetView {
 		
 		$this->addValidationRules([
 			'from' => 'string', // Dashboard timeframe start (e.g., "now-6h", "2025-01-01 00:00:00")
-			'to' => 'string'    // Dashboard timeframe end (e.g., "now", "2025-01-31 23:59:59")
+			'to' => 'string',   // Dashboard timeframe end (e.g., "now", "2025-01-31 23:59:59")
+			'_hostid' => 'id',  // Dashboard host context (underscore prefix for dashboard inputs)
+			'templateid' => 'id', // Template dashboard ID (when widget is on template dashboard)
+			'hostid' => 'id'    // Host ID (when viewing template dashboard on host page)
 		]);
 	}
 
@@ -104,6 +107,11 @@ class WidgetView extends CControllerDashboardWidgetView {
 		$hostids = $this->fields_values['hostids'];
 		$item_pattern = $this->fields_values['item_pattern'] ?? '';
 		$pattern_mode = (int)($this->fields_values['pattern_mode'] ?? 0);
+		$missing_data = (int)($this->fields_values['missing_data'] ?? 0);
+		$graph_type = (int)($this->fields_values['graph_type'] ?? 0);
+		$bar_separation = (int)($this->fields_values['bar_separation'] ?? 5);
+		$bar_display_mode = (int)($this->fields_values['bar_display_mode'] ?? 0);
+		$distribution_bins = (int)($this->fields_values['distribution_bins'] ?? 10);
 		$show_legend = $this->fields_values['show_legend'] ?? 1;
 		$legend_position = $this->fields_values['legend_position'] ?? 0;
 		$graph_colors = $this->fields_values['graph_colors'] ?? '#1f77b4,#ff7f0e,#2ca02c,#d62728,#9467bd';
@@ -118,9 +126,14 @@ class WidgetView extends CControllerDashboardWidgetView {
 		$text_color_xaxis = $this->fields_values['text_color_xaxis'] ?? '#000000';
 		$text_color_yaxis = $this->fields_values['text_color_yaxis'] ?? '#000000';
 		
-		// If no host selected, use dashboard context (template/host dashboard)
-		if (empty($hostids) && $this->hasInput('hostid')) {
-			$hostids = [$this->getInput('hostid')];
+		// Host resolution with dashboard context priority
+		// When widget declares getIn() with DATA_TYPE_HOST_ID AND hostids is empty/FOREIGN_REFERENCE,
+		// Zabbix passes _hostid from dashboard
+		$dashboard_hostid = $this->hasInput('_hostid') ? $this->getInput('_hostid') : null;
+		
+		// Use dashboard host if available, otherwise use configured hostids
+		if ($dashboard_hostid !== null && is_numeric($dashboard_hostid) && $dashboard_hostid > 0) {
+			$hostids = [$dashboard_hostid];
 		}
 
 		// Get time range from dashboard time selector or widget time period
@@ -191,7 +204,12 @@ class WidgetView extends CControllerDashboardWidgetView {
 					'grid_density' => $grid_density,
 					'text_color_legend' => $text_color_legend,
 					'text_color_xaxis' => $text_color_xaxis,
-					'text_color_yaxis' => $text_color_yaxis
+					'text_color_yaxis' => $text_color_yaxis,
+					'missing_data' => $missing_data,
+					'graph_type' => $graph_type,
+					'bar_separation' => $bar_separation,
+					'bar_display_mode' => $bar_display_mode,
+					'distribution_bins' => $distribution_bins
 				]);					if (empty($graph_data['series'])) {
 						$total_points = 0;
 						foreach ($history_data as $item_history) {
@@ -203,8 +221,16 @@ class WidgetView extends CControllerDashboardWidgetView {
 			} catch (\Exception $e) {
 				$error = $e->getMessage();
 			}
-		} else {
+		} elseif (empty($hostids) && $item_pattern !== '') {
+			// Template dashboard: pattern configured but no host context available
+			// This happens in template dashboard edit mode (no host selected yet)
+			$error = _('Widget is configured. Graph will display when dashboard is applied to a host.');
+		} elseif (empty($hostids) && $item_pattern === '') {
+			// Nothing configured at all
 			$error = _('Please configure the widget');
+		} else {
+			// Has host but no pattern
+			$error = _('Please configure item pattern');
 		}
 		
 		$this->setResponse(new CControllerResponseData([
@@ -212,6 +238,7 @@ class WidgetView extends CControllerDashboardWidgetView {
 			'hostids' => $hostids,
 			'item_pattern' => $item_pattern,
 			'pattern_mode' => $pattern_mode,
+			'missing_data' => $missing_data,
 			'show_legend' => $show_legend,
 			'graph_data' => $graph_data,
 			'error' => $error,

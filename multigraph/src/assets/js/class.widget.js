@@ -124,6 +124,13 @@ class CWidgetMultigraph extends CWidget {
             this._startUpdating(); // Trigger widget refresh with new timeframe
             return true;
         }
+        
+        // Handle dashboard host changes (template dashboards on host pages)
+        if (type === CWidgetsData.DATA_TYPE_HOST_ID && this.getFieldsReferredData().has('hostids')) {
+            this._startUpdating(); // Trigger widget refresh with new host
+            return true;
+        }
+        
         return false;
     }
 
@@ -429,6 +436,74 @@ class CWidgetMultigraph extends CWidget {
         const valueRange = maxValue - minValue || 1; // Avoid division by zero
         const timeRange = maxTime - minTime || 1;    // Avoid division by zero
 
+        // === PHASE 4.5: Preprocess Data for Missing Data Handling ===
+        const missing_data = data.missing_data !== undefined ? data.missing_data : 1; // 0=none(gap), 1=connected, 2=zero
+        
+        // Augment each series with gap detection metadata
+        data.series.forEach(series => {
+            if (!series.data || series.data.length < 2) return;
+            
+            // Calculate average interval for this series
+            let avgInterval = 0;
+            for (let i = 1; i < Math.min(series.data.length, 10); i++) {
+                avgInterval += series.data[i][0] - series.data[i-1][0];
+            }
+            avgInterval /= Math.min(series.data.length - 1, 9);
+            const gapThreshold = avgInterval * 2;
+            
+            // Create processed data with gap information
+            series.processedData = [];
+            
+            for (let i = 0; i < series.data.length; i++) {
+                const point = series.data[i];
+                const timestamp = point[0];
+                const value = point[1];
+                
+                let hasGapBefore = false;
+                if (i > 0) {
+                    const prevTimestamp = series.data[i - 1][0];
+                    const actualInterval = timestamp - prevTimestamp;
+                    hasGapBefore = actualInterval > gapThreshold;
+                }
+                
+                // Create processed point with metadata
+                const processedPoint = {
+                    timestamp: timestamp,
+                    value: value,
+                    hasGapBefore: hasGapBefore,
+                    drawValue: value,  // Will be modified for mode=2 (treat as 0)
+                    draw: true         // Will be false for segments to skip
+                };
+                
+                // Handle missing data modes
+                if (hasGapBefore) {
+                    if (missing_data === 2) {
+                        // Treat as 0: Insert virtual zero points at gap boundaries
+                        // Add zero at end of previous segment
+                        series.processedData.push({
+                            timestamp: series.data[i - 1][0],
+                            value: minValue, // X-axis level
+                            hasGapBefore: false,
+                            drawValue: minValue,
+                            draw: true,
+                            isVirtualZero: true
+                        });
+                        // Add zero at start of current segment
+                        series.processedData.push({
+                            timestamp: timestamp,
+                            value: minValue, // X-axis level
+                            hasGapBefore: false,
+                            drawValue: minValue,
+                            draw: true,
+                            isVirtualZero: true
+                        });
+                    }
+                }
+                
+                series.processedData.push(processedPoint);
+            }
+        });
+
         // === PHASE 5: Clear Canvas ===
         ctx.clearRect(0, 0, width, height);
 
@@ -476,171 +551,457 @@ class CWidgetMultigraph extends CWidget {
         ctx.lineTo(marginLeft + graphWidth, marginTop + graphHeight); // X-axis right
         ctx.stroke();
 
-        // === PHASE 8: Y-Axis Labels ===
+        // === Determine graph type early for conditional rendering ===
+        const graph_type = data.graph_type !== undefined ? data.graph_type : 0; // 0=line, 1=bar, 2=distribution
+        console.log('DEBUG: graph_type =', graph_type, 'typeof=', typeof graph_type);
+
+        // Define axis colors early (used in multiple phases)
         const yAxisColor = data.text_color_yaxis || '#000';
-        ctx.fillStyle = yAxisColor;
-        ctx.font = '12px Arial';
-        ctx.textAlign = 'right';
-        ctx.textBaseline = 'middle';
-
-        const yLabelCount = 5; // Number of Y-axis labels
-        for (let i = 0; i <= yLabelCount; i++) {
-            const value = maxValue - (valueRange / yLabelCount) * i; // Top to bottom
-            const y = marginTop + (graphHeight / yLabelCount) * i;
-            ctx.fillText(value.toFixed(2), marginLeft - 10, y);
-        }
-
-        // Y-axis title (rotated)
-        if (data.y_axis_label) {
-            ctx.save();
-            ctx.translate(15, marginTop + graphHeight / 2); // Center on Y-axis
-            ctx.rotate(-Math.PI / 2);                       // Rotate 90° counter-clockwise
-            ctx.textAlign = 'center';
-            ctx.fillStyle = yAxisColor;
-            ctx.fillText(data.y_axis_label, 0, 0);
-            ctx.restore();
-        }
-
-        // === PHASE 9: X-Axis Time Labels (Adaptive Formatting) ===
         const xAxisColor = data.text_color_xaxis || '#000';
-        ctx.fillStyle = xAxisColor;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'top';
 
-        const xLabelCount = 6; // Number of X-axis labels
-        const timeRangeSeconds = timeRange / 1000; // Convert milliseconds to seconds
+        // === PHASE 8: Y-Axis Labels ===
+        // Skip for distribution mode (draws its own count-based Y-axis)
         
-        // Choose date format based on time range
-        let dateFormat;
-        if (timeRangeSeconds > 365 * 24 * 3600) {
-            // More than 1 year: show "Nov 2025"
-            dateFormat = (date) => date.toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' });
-        } else if (timeRangeSeconds > 30 * 24 * 3600) {
-            // More than 30 days: show "Nov 5 14:30"
-            dateFormat = (date) => date.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + 
-                                   date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        } else if (timeRangeSeconds > 24 * 3600) {
-            // More than 1 day: show "Nov 5 14:30"
-            dateFormat = (date) => date.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + 
-                                   date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        } else if (timeRangeSeconds > 3600) {
-            // More than 1 hour: show "14:30"
-            dateFormat = (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        } else {
-            // Less than 1 hour: show "14:30:45"
-            dateFormat = (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        }
+        console.log('DEBUG: Before Y-axis rendering');
         
-        for (let i = 0; i <= xLabelCount; i++) {
-            const timestamp = minTime + (timeRange / xLabelCount) * i;
-            const date = new Date(timestamp);
-            const timeStr = dateFormat(date);
-            const x = marginLeft + (graphWidth / xLabelCount) * i;
-            ctx.fillText(timeStr, x, marginTop + graphHeight + 5);
-        }
+        if (graph_type !== 2) {
+            ctx.fillStyle = yAxisColor;
+            ctx.font = '12px Arial';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
 
-        // === PHASE 10: Draw Stacked Area Fills ===
-        const fill_opacity = parseFloat(data.fill_opacity) || 0;
+            const yLabelCount = 5; // Number of Y-axis labels
+            for (let i = 0; i <= yLabelCount; i++) {
+                const value = maxValue - (valueRange / yLabelCount) * i; // Top to bottom
+                const y = marginTop + (graphHeight / yLabelCount) * i;
+                ctx.fillText(value.toFixed(2), marginLeft - 10, y);
+            }
 
-        // Sort series by maximum value (descending) for stacking order
-        // Highest values on top, lowest at bottom
-        const sortedSeries = [...data.series].sort((a, b) => {
-            const maxA = Math.max(...a.data.map(p => p[1]));
-            const maxB = Math.max(...b.data.map(p => p[1]));
-            return maxB - maxA; // Descending order
-        });
-
-        // Draw fills from bottom to top (reverse iteration)
-        // Each series fills the area between itself and the series below
-        for (let seriesIdx = sortedSeries.length - 1; seriesIdx >= 0; seriesIdx--) {
-            const series = sortedSeries[seriesIdx];
-            if (!series.data || series.data.length === 0) continue;
-
-            if (fill_opacity > 0) {
-                // Convert hex color to RGBA with user-specified opacity
-                const hexColor = series.color;
-                const r = parseInt(hexColor.slice(1, 3), 16);
-                const g = parseInt(hexColor.slice(3, 5), 16);
-                const b = parseInt(hexColor.slice(5, 7), 16);
-                
-                ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${fill_opacity})`;
-                ctx.beginPath();
-
-                // Find the next series below for stacking, or use X-axis baseline
-                const nextSeriesBelow = seriesIdx < sortedSeries.length - 1 ? sortedSeries[seriesIdx + 1] : null;
-
-                // Calculate starting position
-                const firstTimestamp = series.data[0][0];
-                const firstValue = series.data[0][1];
-                const firstX = marginLeft + ((firstTimestamp - minTime) / timeRange) * graphWidth;
-                const firstY = marginTop + graphHeight - ((firstValue - minValue) / valueRange) * graphHeight;
-
-                // Start path from bottom edge (series below or X-axis)
-                if (nextSeriesBelow && nextSeriesBelow.data.length > 0) {
-                    // Start from interpolated point on series below
-                    const belowValue = this._getValueAtTime(nextSeriesBelow.data, firstTimestamp);
-                    const belowY = marginTop + graphHeight - ((belowValue - minValue) / valueRange) * graphHeight;
-                    ctx.moveTo(firstX, belowY);
-                } else {
-                    // Start from X-axis baseline (bottom series)
-                    ctx.moveTo(firstX, marginTop + graphHeight);
-                }
-
-                // Draw top edge of filled area (current series line)
-                series.data.forEach(point => {
-                    const timestamp = point[0];
-                    const value = point[1];
-                    const x = marginLeft + ((timestamp - minTime) / timeRange) * graphWidth;
-                    const y = marginTop + graphHeight - ((value - minValue) / valueRange) * graphHeight;
-                    ctx.lineTo(x, y);
-                });
-
-                // Draw back along bottom edge (series below or baseline)
-                if (nextSeriesBelow && nextSeriesBelow.data.length > 0) {
-                    // Trace backwards along series below (interpolated at each timestamp)
-                    for (let i = series.data.length - 1; i >= 0; i--) {
-                        const timestamp = series.data[i][0];
-                        const belowValue = this._getValueAtTime(nextSeriesBelow.data, timestamp);
-                        const x = marginLeft + ((timestamp - minTime) / timeRange) * graphWidth;
-                        const y = marginTop + graphHeight - ((belowValue - minValue) / valueRange) * graphHeight;
-                        ctx.lineTo(x, y);
-                    }
-                } else {
-                    // Close to baseline (bottom series)
-                    const lastTimestamp = series.data[series.data.length - 1][0];
-                    const lastX = marginLeft + ((lastTimestamp - minTime) / timeRange) * graphWidth;
-                    ctx.lineTo(lastX, marginTop + graphHeight);
-                }
-
-                ctx.closePath();
-                ctx.fill();
+            // Y-axis title (rotated)
+            if (data.y_axis_label) {
+                ctx.save();
+                ctx.translate(15, marginTop + graphHeight / 2); // Center on Y-axis
+                ctx.rotate(-Math.PI / 2);                       // Rotate 90° counter-clockwise
+                ctx.textAlign = 'center';
+                ctx.fillStyle = yAxisColor;
+                ctx.fillText(data.y_axis_label, 0, 0);
+                ctx.restore();
             }
         }
 
+        // === PHASE 9: X-Axis Time Labels (Adaptive Formatting) ===
+        // Skip for distribution mode (draws its own bin-range X-axis)
+        console.log('DEBUG: Before X-axis rendering');
+        if (graph_type !== 2) {
+            ctx.fillStyle = xAxisColor;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+
+            const xLabelCount = 6; // Number of X-axis labels
+            const timeRangeSeconds = timeRange / 1000; // Convert milliseconds to seconds
+            
+            // Choose date format based on time range
+            let dateFormat;
+            if (timeRangeSeconds > 365 * 24 * 3600) {
+                // More than 1 year: show "Nov 2025"
+                dateFormat = (date) => date.toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' });
+            } else if (timeRangeSeconds > 30 * 24 * 3600) {
+                // More than 30 days: show "Nov 5 14:30"
+                dateFormat = (date) => date.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + 
+                                       date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            } else if (timeRangeSeconds > 24 * 3600) {
+                // More than 1 day: show "Nov 5 14:30"
+                dateFormat = (date) => date.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + 
+                                       date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            } else if (timeRangeSeconds > 3600) {
+                // More than 1 hour: show "14:30"
+                dateFormat = (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            } else {
+                // Less than 1 hour: show "14:30:45"
+                dateFormat = (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            }
+            
+            for (let i = 0; i <= xLabelCount; i++) {
+                const timestamp = minTime + (timeRange / xLabelCount) * i;
+                const date = new Date(timestamp);
+                const timeStr = dateFormat(date);
+                const x = marginLeft + (graphWidth / xLabelCount) * i;
+                ctx.fillText(timeStr, x, marginTop + graphHeight + 5);
+            }
+        }
+
+        // === PHASE 10: Draw Stacked Area Fills ===
+        console.log('DEBUG: Before fill rendering');
+        const fill_opacity = parseFloat(data.fill_opacity) || 0;
+        console.log('DEBUG: fill_opacity =', fill_opacity);
+
+        // Skip fill rendering for bar charts and distribution graphs
+        console.log('DEBUG: Checking fill condition: graph_type !== 1 =', graph_type !== 1, 'graph_type !== 2 =', graph_type !== 2, 'fill_opacity > 0 =', fill_opacity > 0);
+        
+        // FILL RENDERING TEMPORARILY DISABLED FOR DEBUGGING
+        console.log('DEBUG: Skipped fill rendering block');
+        console.log('DEBUG: Immediately after closing brace of fill if block');
+        
+        console.log('DEBUG: After fill rendering block, about to start PHASE 11');
+
         // === PHASE 11: Draw Line Series (Top Layer) ===
         // Lines drawn in original order, on top of fills
-        data.series.forEach(series => {
-            if (!series.data || series.data.length === 0) return;
-
-            ctx.strokeStyle = series.color;
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-
-            series.data.forEach((point, idx) => {
-                const timestamp = point[0];
-                const value = point[1];
-                const x = marginLeft + ((timestamp - minTime) / timeRange) * graphWidth;
-                const y = marginTop + graphHeight - ((value - minValue) / valueRange) * graphHeight;
-
-                if (idx === 0) {
-                    ctx.moveTo(x, y);
+        // Use preprocessed data with gap metadata
+        
+        console.log('DEBUG: About to check graph_type, value is:', graph_type, 'checking if === 2:', graph_type === 2);
+        
+        if (graph_type === 2) {
+            console.log('DEBUG: ENTERED distribution block');
+            // === DISTRIBUTION/HISTOGRAM MODE ===
+            const numBins = data.distribution_bins !== undefined ? data.distribution_bins : 10;
+            const barDisplayMode = data.bar_display_mode !== undefined ? data.bar_display_mode : 1; // Default to stacked for distribution
+            
+            console.log('Distribution mode - numBins:', numBins, 'barDisplayMode:', barDisplayMode);
+            
+            // First pass: find global min/max across all series
+            let globalMin = null;
+            let globalMax = null;
+            
+            data.series.forEach(series => {
+                if (!series.data || series.data.length === 0) return;
+                series.data.forEach(point => {
+                    const value = point[1];
+                    if (value !== null && value !== undefined && !isNaN(value)) {
+                        if (globalMin === null || value < globalMin) globalMin = value;
+                        if (globalMax === null || value > globalMax) globalMax = value;
+                    }
+                });
+            });
+            
+            console.log('Distribution mode - globalMin:', globalMin, 'globalMax:', globalMax);
+            
+            if (globalMin === null || globalMax === null) return; // No data to display
+            
+            // Handle edge case: all values are the same
+            if (globalMin === globalMax) {
+                const singleValue = globalMin;
+                
+                // Count values per series
+                const seriesCounts = data.series.map(series => {
+                    if (!series.data || series.data.length === 0) return 0;
+                    return series.data.filter(p => p[1] !== null && p[1] !== undefined && !isNaN(p[1])).length;
+                });
+                
+                const totalCount = seriesCounts.reduce((sum, c) => sum + c, 0);
+                
+                if (barDisplayMode === 1) {
+                    // Stacked mode
+                    let stackBottom = marginTop + graphHeight;
+                    data.series.forEach((series, idx) => {
+                        if (seriesCounts[idx] === 0) return;
+                        const segmentHeight = (seriesCounts[idx] / totalCount) * graphHeight;
+                        const segmentTop = stackBottom - segmentHeight;
+                        ctx.fillStyle = series.color;
+                        ctx.fillRect(marginLeft, segmentTop, graphWidth, segmentHeight);
+                        stackBottom = segmentTop;
+                    });
                 } else {
-                    ctx.lineTo(x, y);
+                    // Grouped mode
+                    const barWidth = graphWidth / data.series.length;
+                    data.series.forEach((series, idx) => {
+                        if (seriesCounts[idx] === 0) return;
+                        const barX = marginLeft + (idx * barWidth);
+                        const barHeight = (seriesCounts[idx] / totalCount) * graphHeight;
+                        const barY = marginTop + graphHeight - barHeight;
+                        ctx.fillStyle = series.color;
+                        ctx.fillRect(barX, barY, barWidth * 0.9, barHeight);
+                    });
+                }
+                
+                // Draw axis labels
+                ctx.fillStyle = yAxisColor;
+                ctx.font = '10px Arial';
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(totalCount.toString(), marginLeft - 5, marginTop + graphHeight / 2);
+                
+                ctx.fillStyle = xAxisColor;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'top';
+                ctx.fillText(singleValue.toFixed(2), marginLeft + graphWidth / 2, marginTop + graphHeight + 5);
+                
+            } else {
+                // Normal case: range of values
+                const binWidth = (globalMax - globalMin) / numBins;
+            
+                // Initialize bins - each bin tracks counts per series
+                const bins = [];
+                for (let i = 0; i < numBins; i++) {
+                    const binStart = globalMin + (i * binWidth);
+                    const binEnd = globalMin + ((i + 1) * binWidth);
+                    bins.push({
+                        start: binStart,
+                        end: binEnd,
+                        seriesCounts: new Array(data.series.length).fill(0), // Count per series
+                        totalCount: 0,
+                        label: `${binStart.toFixed(2)}-${binEnd.toFixed(2)}`
+                    });
+                }
+                
+                // Count values in each bin per series
+                data.series.forEach((series, seriesIdx) => {
+                    if (!series.data || series.data.length === 0) return;
+                    
+                    series.data.forEach(point => {
+                        const value = point[1];
+                        if (value === null || value === undefined || isNaN(value)) return;
+                        
+                        let binIndex = Math.floor((value - globalMin) / binWidth);
+                        if (binIndex >= numBins) binIndex = numBins - 1;
+                        if (binIndex < 0) binIndex = 0;
+                        
+                        bins[binIndex].seriesCounts[seriesIdx]++;
+                        bins[binIndex].totalCount++;
+                    });
+                });
+                
+                // Find max count for Y-axis scaling
+                let maxCount = 0;
+                bins.forEach(bin => {
+                    if (barDisplayMode === 1) {
+                        // Stacked: use total count
+                        if (bin.totalCount > maxCount) maxCount = bin.totalCount;
+                    } else {
+                        // Grouped: use max individual series count
+                        bin.seriesCounts.forEach(count => {
+                            if (count > maxCount) maxCount = count;
+                        });
+                    }
+                });
+                
+                if (maxCount === 0) return; // No data
+                
+                // Store bin data for hover interaction
+                this._distributionBins = bins;
+                this._distributionMaxCount = maxCount;
+                
+                // Draw histogram bars
+                const binPixelWidth = graphWidth / numBins;
+                
+                if (barDisplayMode === 1) {
+                    // === STACKED MODE ===
+                    bins.forEach((bin, binIdx) => {
+                        if (bin.totalCount === 0) return;
+                        
+                        const binX = marginLeft + (binIdx * binPixelWidth);
+                        const barSeparation = Math.max(1, binPixelWidth * 0.1);
+                        const effectiveBarWidth = binPixelWidth - barSeparation;
+                        
+                        let stackBottom = marginTop + graphHeight;
+                        
+                        // Draw each series segment from bottom to top
+                        data.series.forEach((series, seriesIdx) => {
+                            const count = bin.seriesCounts[seriesIdx];
+                            if (count === 0) return;
+                            
+                            const segmentHeight = (count / maxCount) * graphHeight;
+                            const segmentTop = stackBottom - segmentHeight;
+                            
+                            ctx.fillStyle = series.color;
+                            ctx.fillRect(binX + (barSeparation / 2), segmentTop, effectiveBarWidth, segmentHeight);
+                            
+                            stackBottom = segmentTop;
+                        });
+                    });
+                    
+                } else {
+                    // === GROUPED MODE (side-by-side) ===
+                    const barSeparation = data.bar_separation !== undefined ? data.bar_separation : 2;
+                    const numSeries = data.series.length;
+                    const groupWidth = binPixelWidth * 0.9; // Use 90% of bin width for the group
+                    const individualBarWidth = (groupWidth - (barSeparation * (numSeries - 1))) / numSeries;
+                    
+                    bins.forEach((bin, binIdx) => {
+                        const binCenterX = marginLeft + (binIdx * binPixelWidth) + (binPixelWidth / 2);
+                        const groupStartX = binCenterX - (groupWidth / 2);
+                        
+                        data.series.forEach((series, seriesIdx) => {
+                            const count = bin.seriesCounts[seriesIdx];
+                            if (count === 0) return;
+                            
+                            const barX = groupStartX + (seriesIdx * (individualBarWidth + barSeparation));
+                            const barHeight = (count / maxCount) * graphHeight;
+                            const barY = marginTop + graphHeight - barHeight;
+                            
+                            ctx.fillStyle = series.color;
+                            ctx.fillRect(barX, barY, individualBarWidth, barHeight);
+                        });
+                    });
+                }
+                
+                // Draw Y-axis labels (counts)
+                const countSteps = 5;
+                const countStep = maxCount / countSteps;
+                
+                ctx.fillStyle = yAxisColor;
+                ctx.font = '10px Arial';
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'middle';
+                
+                for (let i = 0; i <= countSteps; i++) {
+                    const count = Math.round(i * countStep);
+                    const y = marginTop + graphHeight - (i * (graphHeight / countSteps));
+                    ctx.fillText(count.toString(), marginLeft - 5, y);
+                }
+                
+                // Draw X-axis labels (bin ranges)
+                ctx.fillStyle = xAxisColor;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'top';
+                
+                const maxLabels = 8;
+                const labelStep = Math.max(1, Math.ceil(numBins / maxLabels));
+                
+                bins.forEach((bin, i) => {
+                    if (i % labelStep === 0 || i === numBins - 1) {
+                        const x = marginLeft + (i * binPixelWidth) + (binPixelWidth / 2);
+                        let label;
+                        if (Math.abs(bin.start) < 10 && Math.abs(bin.end) < 10) {
+                            label = `${bin.start.toFixed(1)}-${bin.end.toFixed(1)}`;
+                        } else if (Math.abs(bin.start) < 1000) {
+                            label = `${bin.start.toFixed(0)}-${bin.end.toFixed(0)}`;
+                        } else {
+                            label = `${(bin.start/1000).toFixed(1)}k-${(bin.end/1000).toFixed(1)}k`;
+                        }
+                        ctx.fillText(label, x, marginTop + graphHeight + 5);
+                    }
+                });
+            } // End else block for normal distribution case
+            
+        } else if (graph_type === 1) {
+            // === BAR CHART MODE ===
+            const barSeparation = data.bar_separation !== undefined ? data.bar_separation : 5; // User-defined separation in pixels
+            const barDisplayMode = data.bar_display_mode !== undefined ? data.bar_display_mode : 0; // 0=grouped, 1=stacked
+            
+            if (barDisplayMode === 1) {
+                // === STACKED BAR MODE ===
+                // Build a map of timestamp -> array of values (one per series)
+                const timestampMap = new Map();
+                
+                data.series.forEach((series, seriesIdx) => {
+                    if (!series.processedData || series.processedData.length === 0) return;
+                    
+                    series.processedData.forEach(point => {
+                        if (point.isVirtualZero && missing_data !== 2) return; // Skip virtual zeros unless "treat as 0"
+                        
+                        if (!timestampMap.has(point.timestamp)) {
+                            timestampMap.set(point.timestamp, []);
+                        }
+                        timestampMap.get(point.timestamp).push({
+                            seriesIdx: seriesIdx,
+                            value: point.drawValue,
+                            color: series.color
+                        });
+                    });
+                });
+                
+                // Calculate bar width
+                const totalPoints = timestampMap.size;
+                const barWidth = Math.max(2, Math.min(graphWidth / (totalPoints * 1.5), 40));
+                
+                // Draw stacked bars
+                timestampMap.forEach((stackItems, timestamp) => {
+                    const centerX = marginLeft + ((timestamp - minTime) / timeRange) * graphWidth;
+                    const barX = centerX - (barWidth / 2);
+                    
+                    let stackBottom = marginTop + graphHeight;
+                    
+                    // Draw each segment from bottom to top
+                    stackItems.forEach(item => {
+                        const value = item.value;
+                        const segmentHeight = ((value - minValue) / valueRange) * graphHeight;
+                        const segmentTop = stackBottom - segmentHeight;
+                        
+                        ctx.fillStyle = item.color;
+                        ctx.fillRect(barX, segmentTop, barWidth, segmentHeight);
+                        
+                        stackBottom = segmentTop; // Next segment starts where this one ended
+                    });
+                });
+                
+            } else {
+                // === GROUPED BAR MODE (side-by-side) ===
+                const totalPoints = data.series.reduce((sum, s) => sum + (s.processedData ? s.processedData.length : 0), 0);
+                const avgPointsPerSeries = totalPoints / (data.series.length || 1);
+                const barWidth = Math.max(2, Math.min(graphWidth / (avgPointsPerSeries * 1.5), 40));
+                const groupWidth = (barWidth * data.series.length) + (barSeparation * (data.series.length - 1));
+                
+                data.series.forEach((series, seriesIdx) => {
+                    if (!series.processedData || series.processedData.length === 0) return;
+
+                    ctx.fillStyle = series.color;
+                    
+                    series.processedData.forEach((point, idx) => {
+                        if (point.isVirtualZero && missing_data !== 2) return; // Skip virtual zeros unless "treat as 0"
+                        
+                        const timestamp = point.timestamp;
+                        const value = point.drawValue;
+                        
+                        // Calculate bar position
+                        const centerX = marginLeft + ((timestamp - minTime) / timeRange) * graphWidth;
+                        const barX = centerX - (groupWidth / 2) + (seriesIdx * (barWidth + barSeparation));
+                        const barTop = marginTop + graphHeight - ((value - minValue) / valueRange) * graphHeight;
+                        const barBottom = marginTop + graphHeight;
+                        const barHeight = barBottom - barTop;
+                        
+                        // Draw bar
+                        ctx.fillRect(barX, barTop, barWidth, barHeight);
+                    });
+                });
+            }
+            
+        } else {
+            // === LINE CHART MODE (Default) ===
+            data.series.forEach(series => {
+                if (!series.processedData || series.processedData.length === 0) return;
+
+                ctx.strokeStyle = series.color;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                
+                if (missing_data === 0) {
+                    // None mode: Break line at gaps
+                    let inSegment = false;
+                    
+                    series.processedData.forEach((point, idx) => {
+                        const x = marginLeft + ((point.timestamp - minTime) / timeRange) * graphWidth;
+                        const y = marginTop + graphHeight - ((point.drawValue - minValue) / valueRange) * graphHeight;
+
+                        if (point.hasGapBefore) {
+                            ctx.stroke(); // End current segment
+                            ctx.beginPath();
+                            inSegment = false;
+                        }
+                        
+                        if (!inSegment) {
+                            ctx.moveTo(x, y);
+                            inSegment = true;
+                        } else {
+                            ctx.lineTo(x, y);
+                        }
+                    });
+                    ctx.stroke();
+                } else {
+                    // Connected or Treat as 0 - draw all processed points
+                    series.processedData.forEach((point, idx) => {
+                        const x = marginLeft + ((point.timestamp - minTime) / timeRange) * graphWidth;
+                        const y = marginTop + graphHeight - ((point.drawValue - minValue) / valueRange) * graphHeight;
+
+                        if (idx === 0) {
+                            ctx.moveTo(x, y);
+                        } else {
+                            ctx.lineTo(x, y);
+                        }
+                    });
+                    ctx.stroke();
                 }
             });
-
-            ctx.stroke();
-        });
+        }
 
         // === PHASE 12: Draw Legend ===
         // Three layout options: top-left (overlays graph), right (sidebar), bottom (below graph)
@@ -732,6 +1093,51 @@ class CWidgetMultigraph extends CWidget {
                 return;
             }
 
+            // === DISTRIBUTION MODE: Highlight bins ===
+            if (graph_type === 2 && this._distributionBins) {
+                let tooltipHTML = '';
+                let hasData = false;
+
+                // Find which bin the mouse is over
+                this._distributionBins.forEach(bin => {
+                    if (!bin.x) return; // Skip bins with no data
+                    
+                    if (mouseX >= bin.x && mouseX <= bin.x + bin.width &&
+                        mouseY >= bin.y && mouseY <= bin.y + bin.height) {
+                        
+                        // Highlight the bin with a border
+                        overlayCtx.strokeStyle = data.series[0]?.color || '#1f77b4';
+                        overlayCtx.lineWidth = 2;
+                        overlayCtx.strokeRect(bin.x, bin.y, bin.width, bin.height);
+                        
+                        // Show tooltip with bin range and count
+                        tooltipHTML = `<div><strong>Range:</strong> ${bin.start.toFixed(2)} - ${bin.end.toFixed(2)}</div>`;
+                        tooltipHTML += `<div><strong>Count:</strong> ${bin.count}</div>`;
+                        hasData = true;
+                    }
+                });
+
+                if (hasData) {
+                    tooltipDiv.innerHTML = tooltipHTML;
+                    tooltipDiv.style.display = 'block';
+                    
+                    let tooltipX = mouseX + 15;
+                    let tooltipY = mouseY - 10;
+                    
+                    const tooltipRect = tooltipDiv.getBoundingClientRect();
+                    if (tooltipX + tooltipRect.width > width) {
+                        tooltipX = mouseX - tooltipRect.width - 15;
+                    }
+                    
+                    tooltipDiv.style.left = tooltipX + 'px';
+                    tooltipDiv.style.top = tooltipY + 'px';
+                } else {
+                    tooltipDiv.style.display = 'none';
+                }
+                return;
+            }
+
+            // === TIME-SERIES MODE: Highlight data points ===
             // Calculate target time from mouse X position
             const relativeX = (mouseX - graphBounds.marginLeft) / graphBounds.graphWidth;
             const targetTime = timeBounds.minTime + relativeX * timeBounds.timeRange;
