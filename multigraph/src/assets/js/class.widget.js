@@ -553,16 +553,13 @@ class CWidgetMultigraph extends CWidget {
 
         // === Determine graph type early for conditional rendering ===
         const graph_type = data.graph_type !== undefined ? data.graph_type : 0; // 0=line, 1=bar, 2=distribution
-        console.log('DEBUG: graph_type =', graph_type, 'typeof=', typeof graph_type);
 
         // Define axis colors early (used in multiple phases)
-        const yAxisColor = data.text_color_yaxis || '#000';
-        const xAxisColor = data.text_color_xaxis || '#000';
+        const yAxisColor = data.text_color_yaxis || '#909090';
+        const xAxisColor = data.text_color_xaxis || '#909090';
 
         // === PHASE 8: Y-Axis Labels ===
         // Skip for distribution mode (draws its own count-based Y-axis)
-        
-        console.log('DEBUG: Before Y-axis rendering');
         
         if (graph_type !== 2) {
             ctx.fillStyle = yAxisColor;
@@ -591,7 +588,6 @@ class CWidgetMultigraph extends CWidget {
 
         // === PHASE 9: X-Axis Time Labels (Adaptive Formatting) ===
         // Skip for distribution mode (draws its own bin-range X-axis)
-        console.log('DEBUG: Before X-axis rendering');
         if (graph_type !== 2) {
             ctx.fillStyle = xAxisColor;
             ctx.textAlign = 'center';
@@ -759,22 +755,15 @@ class CWidgetMultigraph extends CWidget {
                 }
             }
         } // End fill rendering for line graphs
-        
-        console.log('DEBUG: After fill rendering block, about to start PHASE 11');
 
         // === PHASE 11: Draw Line Series (Top Layer) ===
         // Lines drawn in original order, on top of fills
         // Use preprocessed data with gap metadata
         
-        console.log('DEBUG: About to check graph_type, value is:', graph_type, 'checking if === 2:', graph_type === 2);
-        
         if (graph_type === 2) {
-            console.log('DEBUG: ENTERED distribution block');
             // === DISTRIBUTION/HISTOGRAM MODE ===
             const numBins = data.distribution_bins !== undefined ? data.distribution_bins : 10;
             const barDisplayMode = data.bar_display_mode !== undefined ? data.bar_display_mode : 1; // Default to stacked for distribution
-            
-            console.log('Distribution mode - numBins:', numBins, 'barDisplayMode:', barDisplayMode);
             
             // First pass: find global min/max across all series
             let globalMin = null;
@@ -790,8 +779,6 @@ class CWidgetMultigraph extends CWidget {
                     }
                 });
             });
-            
-            console.log('Distribution mode - globalMin:', globalMin, 'globalMax:', globalMax);
             
             if (globalMin === null || globalMax === null) return; // No data to display
             
@@ -1123,7 +1110,7 @@ class CWidgetMultigraph extends CWidget {
 
         // === PHASE 12: Draw Legend ===
         // Three layout options: top-left (overlays graph), right (sidebar), bottom (below graph)
-        const legendColor = data.text_color_legend || '#000';
+        const legendColor = data.text_color_legend || '#909090';
         ctx.font = '12px Arial';
         ctx.textBaseline = 'middle';
 
