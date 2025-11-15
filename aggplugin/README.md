@@ -28,6 +28,21 @@ Aggregated Metrics Plugin for Zabbix
 
 ## Overview
 
+This plugin provides continuous metric aggregation with comprehensive statistics for Zabbix Agent2. It maintains background sampling threads that collect measurements at regular intervals, compute statistics (average, min, max, median, mode, standard deviation, variance, count), and serve aggregated results to Zabbix queries.
+
+**Key Features:**
+- Background continuous sampling (default 1-second intervals)
+- 8 comprehensive statistics per metric
+- Extensible via dynamically loaded measurement plugin DLLs
+- Multi-source metric support (per-disk, per-CPU, etc.)
+- Automatic statistics reset at configurable thresholds
+- JSON output format with aggregate and per-source data
+
+**📦 NEW: Portable Project Structure**
+This project now supports a portable setup. See `PORTABLE_SETUP.txt` in the parent `Cpp/` directory for complete instructions on setting up the project on a new system.
+
+---
+
 High-performance Windows metrics aggregation plugin for Zabbix Agent2. Continuously samples system metrics (CPU, memory) and computes comprehensive statistics including average, min/max, median, mode, standard deviation, and variance. Built with C++ for performance and Go for Agent2 integration.
 
 **NEW in 0.1 (tmp0.1)**: 🎉 **Plugin Framework** - Extend aggplugin with loadable measurement plugins! Add custom metrics by dropping DLLs into a directory. See [PLUGIN_DEVELOPMENT.md](PLUGIN_DEVELOPMENT.md) for details.

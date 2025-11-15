@@ -21,6 +21,10 @@
 #      include "../../../zabbixlib/include/sysinc.h"
 #      include "../../../zabbixlib/include/module.h"
 #      define HAVE_ZABBIX_HEADERS 1
+#    elif __has_include("../../../../zabbixlib/include/module.h")
+#      include "../../../../zabbixlib/include/sysinc.h"
+#      include "../../../../zabbixlib/include/module.h"
+#      define HAVE_ZABBIX_HEADERS 1
 #    endif
 #  endif
 #endif

@@ -53,16 +53,28 @@ Push-Location -Path (Join-Path $PSScriptRoot "cpp_agent_wrapper")
 try {
     $commonPath = Join-Path $PSScriptRoot "cpp_common"
     
+    # Detect zabbixlib location (portable: ../../../zabbixlib or ../../zabbixlib)
+    $zabbixInclude = ""
+    if (Test-Path "$PWD/../../../zabbixlib/include") {
+        $zabbixInclude = "-I`"$PWD/../../../zabbixlib/include`""
+        Write-Host "Using zabbixlib from: $PWD/../../../zabbixlib/include"
+    } elseif (Test-Path "$PWD/../../../../zabbixlib/include") {
+        $zabbixInclude = "-I`"$PWD/../../../../zabbixlib/include`""
+        Write-Host "Using zabbixlib from: $PWD/../../../../zabbixlib/include"
+    } else {
+        Write-Warning "zabbixlib headers not found (optional for Go external plugin)"
+    }
+    
     if ($Variant -eq 'classic' -or $Variant -eq 'both') {
         Write-Host "Building classic agent DLL..."
-        g++ -shared -o "../build/aggplugin_classic.dll" unified_wrapper.cpp "$commonPath/plugin_common.cpp" "$commonPath/plugin_loader.cpp" "$commonPath/collector.cpp" -I"$PWD/../../../zabbixlib/include" -I"$commonPath" -DZABBIX_CLASSIC_AGENT -static-libgcc -static-libstdc++ -lpdh
+        g++ -shared -o "../build/aggplugin_classic.dll" unified_wrapper.cpp "$commonPath/plugin_common.cpp" "$commonPath/plugin_loader.cpp" "$commonPath/collector.cpp" $zabbixInclude -I"$commonPath" -DZABBIX_CLASSIC_AGENT -static-libgcc -static-libstdc++ -lpdh
         if ($LASTEXITCODE -ne 0) { throw "classic build failed" }
         Write-Host "Created build/aggplugin_classic.dll"
     }
 
     if ($Variant -eq 'agent2' -or $Variant -eq 'both') {
         Write-Host "Building agent2 plugin DLL (requires agent2 headers/libs)..."
-        g++ -shared -o "../build/aggplugin_agent2.dll" unified_wrapper.cpp "$commonPath/plugin_common.cpp" "$commonPath/collector.cpp" "$commonPath/plugin_loader.cpp" -I"$PWD/../../../zabbixlib/include" -I"$commonPath" -DZABBIX_AGENT2 -static-libgcc -static-libstdc++ -lpdh
+        g++ -shared -o "../build/aggplugin_agent2.dll" unified_wrapper.cpp "$commonPath/plugin_common.cpp" "$commonPath/collector.cpp" "$commonPath/plugin_loader.cpp" $zabbixInclude -I"$commonPath" -DZABBIX_AGENT2 -static-libgcc -static-libstdc++ -lpdh
         if ($LASTEXITCODE -ne 0) { Write-Warning "agent2 build failed (likely missing SDK headers/libs)." }
         else { Write-Host "Created build/aggplugin_agent2.dll" }
     }
