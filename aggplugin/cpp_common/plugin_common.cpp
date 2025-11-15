@@ -350,7 +350,7 @@ extern "C" double plugin_sample_numeric(const char *metric, int *ok) {
     std::string m(metric);
 
 #ifdef _WIN32
-    if (m == "cpu_load") {
+    if (m == "cpu_load" || m == "_internal.cpu_load") {
         double pct = 0.0;
         if (sample_cpu_load_percent(pct)) {
             *ok = 1;
@@ -358,7 +358,7 @@ extern "C" double plugin_sample_numeric(const char *metric, int *ok) {
         }
         return 0.0; // First sample (baseline) or API error
     }
-    if (m == "mem_free") {
+    if (m == "mem_free" || m == "_internal.mem_free") {
         double mb = 0.0;
         if (sample_mem_free_mb(mb)) {
             *ok = 1;
@@ -368,8 +368,8 @@ extern "C" double plugin_sample_numeric(const char *metric, int *ok) {
     }
 #else
     // Non-Windows fallback: Return dummy values for testing/compilation
-    if (m == "cpu_load") { *ok = 1; return 10.0; }
-    if (m == "mem_free") { *ok = 1; return 2048.0; }
+    if (m == "cpu_load" || m == "_internal.cpu_load") { *ok = 1; return 10.0; }
+    if (m == "mem_free" || m == "_internal.mem_free") { *ok = 1; return 2048.0; }
 #endif
 
     return 0.0; // Unsupported metric

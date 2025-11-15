@@ -33,9 +33,8 @@
  *   - JSON output compatible with Zabbix preprocessing
  *
  * METRICS PROVIDED:
- *   - aggplugin.test: Connectivity test (returns "success" string)
- *   - aggplugin.cpu_load: CPU load aggregation (JSON with 8 statistics)
- *   - aggplugin.memory_usage: Memory usage aggregation (JSON with 8 statistics)
+ *   - Dynamically loaded from DLL plugins via Plugins.Aggplugin.PluginPath
+ *   - Example plugins: cpu_load, mem_free, disk.io.read[*], disk.io.write[*]
  *
  * CONFIGURATION FILE:
  *   Location: C:\zabbix\conf\zabbix_agent2.d\plugins.d\aggplugin.conf
@@ -430,19 +429,16 @@ func (p *Plugin) Export(key string, params []string, context plugin.ContextProvi
 
 	debugLog(DBG_INFO, fmt.Sprintf("EXPORT CALLED: key=%s, params=%v", key, params))
 
-	// Handle test metric
-	if key == "aggplugin.test" {
-		debugLog(DBG_VERBOSE, "EXPORT: Handling aggplugin.test")
-		result := "Aggplugin minimal test - plugin loaded successfully!"
-		debugLog(DBG_INFO, fmt.Sprintf("EXPORT: Returning: %s", result))
-		return result, nil
+	// Handle internal metrics (built-in, no DLL required)
+	if strings.HasPrefix(key, "aggplugin._internal.") {
+		return p.handleInternalMetric(key, params)
 	}
 
-	// Strip "aggplugin." prefix to get internal collector metric name
+	// Strip "aggplugin." prefix to get collector metric name for DLL metrics
 	metricName := strings.TrimPrefix(key, "aggplugin.")
 
-	// For any metric (plugin or built-in), fetch aggregated data from collector
-	debugLog(DBG_VERBOSE, fmt.Sprintf("Fetching aggregated data for metric: %s", metricName))
+	// For DLL metrics, fetch aggregated data from collector
+	debugLog(DBG_VERBOSE, fmt.Sprintf("Fetching aggregated data for DLL metric: %s", metricName))
 
 	cMetricName := C.CString(metricName)
 	defer C.free(unsafe.Pointer(cMetricName))
@@ -457,6 +453,49 @@ func (p *Plugin) Export(key string, params []string, context plugin.ContextProvi
 
 	result := string(buffer[:clen(buffer)])
 	debugLog(DBG_INFO, fmt.Sprintf("EXPORT: Returning aggregated data for %s: %d bytes", metricName, len(result)))
+	return result, nil
+}
+
+// handleInternalMetric processes built-in internal metrics (no DLL required)
+func (p *Plugin) handleInternalMetric(key string, params []string) (interface{}, error) {
+	debugLog(DBG_VERBOSE, fmt.Sprintf("Handling internal metric: %s", key))
+
+	switch key {
+	case "aggplugin._internal.test":
+		// Simple connectivity test - returns constant string
+		debugLog(DBG_VERBOSE, "Internal test metric - returning success")
+		return "Aggplugin internal test - connectivity OK", nil
+
+	case "aggplugin._internal.cpu_load":
+		// Built-in CPU load using plugin_common.cpp (fallback)
+		debugLog(DBG_VERBOSE, "Internal CPU load metric - using built-in implementation")
+		return p.fetchInternalMetric("_internal.cpu_load")
+
+	case "aggplugin._internal.mem_free":
+		// Built-in memory free using plugin_common.cpp (fallback)
+		debugLog(DBG_VERBOSE, "Internal memory metric - using built-in implementation")
+		return p.fetchInternalMetric("_internal.mem_free")
+
+	default:
+		return nil, fmt.Errorf("unknown internal metric: %s", key)
+	}
+}
+
+// fetchInternalMetric retrieves aggregated data for internal metrics from collector
+func (p *Plugin) fetchInternalMetric(metricName string) (interface{}, error) {
+	cMetricName := C.CString(metricName)
+	defer C.free(unsafe.Pointer(cMetricName))
+
+	buffer := make([]byte, 4096)
+	ret := C.collector_fetch_and_reset_json(cMetricName, (*C.char)(unsafe.Pointer(&buffer[0])), C.uint(len(buffer)))
+
+	if ret != 0 {
+		debugLog(DBG_ERROR, fmt.Sprintf("collector_fetch_and_reset_json failed for %s: %d", metricName, ret))
+		return nil, fmt.Errorf("failed to fetch internal metric %s: %d", metricName, ret)
+	}
+
+	result := string(buffer[:clen(buffer)])
+	debugLog(DBG_INFO, fmt.Sprintf("EXPORT: Returning internal metric %s: %d bytes", metricName, len(result)))
 	return result, nil
 }
 
@@ -526,13 +565,17 @@ func callPluginCollect(plugin *LoadedPlugin, key string, params []string) (inter
 
 func init() {
 	// Register the plugin with Zabbix Agent2
-	// Each metric returns JSON with all aggregation statistics: {"avg":X,"min":X,"max":X,"med":X,"mod":X,"dev":X,"var":X,"cnt":N}
+	// ARCHITECTURE: Two metric types:
+	//   1. INTERNAL METRICS (aggplugin._internal.*): Built-in, always available, no DLL required
+	//   2. DLL METRICS (aggplugin[*]): Dynamically discovered from loaded DLL plugins
+	//
+	// Internal metrics serve as: connectivity test, fallback when no DLLs, reference implementation
+	// DLL metrics are registered at runtime based on plugin_get_info() announcements
 	plugin.RegisterMetrics(&impl, pluginName,
-		"aggplugin.test", "Minimal test metric - returns success message.",
-		"aggplugin.cpu_load", "CPU load aggregation - returns JSON with avg/min/max/med/mod/dev/var/cnt.",
-		"aggplugin.mem_free", "Available physical memory aggregation - returns JSON with avg/min/max/med/mod/dev/var/cnt (MB).",
-		"aggplugin.disk.io.read[*]", "Disk read operations per second - returns JSON with aggregation statistics (per physical disk).",
-		"aggplugin.disk.io.write[*]", "Disk write operations per second - returns JSON with aggregation statistics (per physical disk).",
+		"aggplugin._internal.test", "Internal connectivity test - returns constant success string.",
+		"aggplugin._internal.cpu_load", "Internal CPU load (fallback) - returns JSON with aggregation statistics.",
+		"aggplugin._internal.mem_free", "Internal memory free (fallback) - returns JSON with aggregation statistics.",
+		"aggplugin[*]", "Dynamic metrics from loaded DLL plugins - returns JSON with aggregation statistics.",
 	)
 }
 
@@ -680,6 +723,26 @@ func main() {
 	C.collector_init(C.double(1.0))
 	debugLog(DBG_INFO, "Collector initialized")
 
+	// Register internal metrics (built-in fallbacks, always available)
+	debugLog(DBG_INFO, "Registering internal metrics...")
+	internalMetrics := []struct {
+		name string
+		mult float64
+	}{
+		{"_internal.cpu_load", 1.0},
+		{"_internal.mem_free", 1.0},
+	}
+	for _, metric := range internalMetrics {
+		cName := C.CString(metric.name)
+		ret := C.collector_register_metric(cName, C.double(metric.mult))
+		C.free(unsafe.Pointer(cName))
+		if ret != 0 {
+			debugLog(DBG_ERROR, fmt.Sprintf("Failed to register internal metric %s", metric.name))
+		} else {
+			debugLog(DBG_INFO, fmt.Sprintf("Registered internal metric: %s", metric.name))
+		}
+	}
+
 	// Load measurement plugins from DLLs
 	if err := loadMeasurementPlugins(); err != nil {
 		debugLog(DBG_ERROR, fmt.Sprintf("Failed to load measurement plugins: %v", err))
@@ -692,17 +755,6 @@ func main() {
 
 	debugLog(DBG_INFO, "Metrics registered, collector sampling started")
 
-	// INITIAL RESET: Clear any stale data from collector initialization
-	// This ensures fresh state and that first query gets clean data from time zero
-	debugLog(DBG_VERBOSE, "Performing initial collector reset for clean state...")
-	buffer := make([]byte, 4096)
-	for _, metricName := range []string{"cpu_load", "mem_free", "disk.io.read", "disk.io.write"} {
-		cMetric := C.CString(metricName)
-		C.collector_fetch_and_reset_json(cMetric, (*C.char)(unsafe.Pointer(&buffer[0])), C.uint(len(buffer)))
-		C.free(unsafe.Pointer(cMetric))
-	}
-	debugLog(DBG_VERBOSE, "Initial collector reset complete - all metrics zeroed")
-
 	// PRELOAD: Wait for baseline establishment before accepting queries
 	// Windows sampling requires TWO calls: first establishes baseline, second returns data
 	// Collector samples every 1 second, so wait for initial baseline + configured preload delay
@@ -710,6 +762,28 @@ func main() {
 		debugLog(DBG_INFO, fmt.Sprintf("Preloading: waiting %.1fs for baseline + initial samples on: %s", cfgPreloadDelay, cfgPreloadMetrics))
 		time.Sleep(time.Duration(cfgPreloadDelay * float64(time.Second)))
 		debugLog(DBG_INFO, fmt.Sprintf("Preloading complete: metrics ready with ~%.0f samples", cfgPreloadDelay))
+	}
+
+	// INITIAL RESET: Clear any baseline/stale data from collector initialization
+	// This ensures fresh state and that first query gets clean data from time zero
+	// Only reset metrics specified in PreloadMetrics configuration (or all if empty)
+	if cfgPreloadMetrics != "" {
+		debugLog(DBG_VERBOSE, fmt.Sprintf("Performing initial collector reset for configured metrics: %s", cfgPreloadMetrics))
+		buffer := make([]byte, 4096)
+		metricsToReset := strings.Split(cfgPreloadMetrics, ",")
+		for _, metricName := range metricsToReset {
+			metricName = strings.TrimSpace(metricName)
+			if metricName == "" {
+				continue
+			}
+			cMetric := C.CString(metricName)
+			C.collector_fetch_and_reset_json(cMetric, (*C.char)(unsafe.Pointer(&buffer[0])), C.uint(len(buffer)))
+			C.free(unsafe.Pointer(cMetric))
+			debugLog(DBG_VVERBOSE, fmt.Sprintf("Reset metric: %s", metricName))
+		}
+		debugLog(DBG_VERBOSE, "Initial collector reset complete - configured metrics zeroed")
+	} else {
+		debugLog(DBG_VERBOSE, "Skipping initial reset - PreloadMetrics is empty")
 	}
 
 	// Setup cleanup handler for collector_stop()

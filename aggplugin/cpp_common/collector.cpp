@@ -418,12 +418,14 @@ static double base_interval = 1.0;
  */
 void collector_loop() {
     uint64_t tick = 0;
-    log_debug("Thread started, base_interval=%.1fs, running=%d", base_interval, running.load());
+    // Collector thread logging disabled (verbose, impacts performance)
+    // Uncomment for debugging: log_debug("Thread started, base_interval=%.1fs, running=%d", base_interval, running.load());
     while (running.load()) {
         tick++;
-        if (tick % 5 == 1) {
-            log_debug("Tick %llu, checking %zu metrics, running=%d", (unsigned long long)tick, metrics.size(), running.load());
-        }
+        // Uncomment for very verbose debugging (every 5 ticks):
+        // if (tick % 5 == 1) {
+        //     log_debug("Tick %llu, checking %zu metrics, running=%d", (unsigned long long)tick, metrics.size(), running.load());
+        // }
         {
             std::lock_guard<std::mutex> lk(metrics_m);
             for (auto &kv : metrics) {
@@ -434,7 +436,8 @@ void collector_loop() {
                     double v = plugin_sample_numeric(kv.first.c_str(), &ok);
                     if (ok) {
                         me.acc.add(v);
-                        log_debug("Sampled %s=%.2f", kv.first.c_str(), v);
+                        // Uncomment for sample debugging:
+                        // log_debug("Sampled %s=%.2f", kv.first.c_str(), v);
                     } else {
                         log_debug("ERROR: Failed to sample %s", kv.first.c_str());
                     }
@@ -442,11 +445,12 @@ void collector_loop() {
                 }
             }
         }
-        log_debug("About to sleep for %.1fs (tick %llu)", base_interval, (unsigned long long)tick);
+        // Uncomment for sleep/wake debugging:
+        // log_debug("About to sleep for %.1fs (tick %llu)", base_interval, (unsigned long long)tick);
         std::this_thread::sleep_for(std::chrono::duration<double>(base_interval));
-        log_debug("Woke up from sleep (tick %llu), running=%d", (unsigned long long)tick, running.load());
+        // log_debug("Woke up from sleep (tick %llu), running=%d", (unsigned long long)tick, running.load());
     }
-    log_debug("Thread exiting (running=%d)", running.load());
+    // log_debug("Thread exiting (running=%d)", running.load());
 }
 
 // API FUNCTION IMPLEMENTATIONS:
@@ -507,13 +511,14 @@ extern "C" void collector_stop() {
  */
 extern "C" int collector_register_metric(const char *name, double multiplicator) {
     if (!name) return 1;
-    log_debug("Registering metric: %s (multiplicator=%.2f)", name, multiplicator);
+    // Uncomment for registration debugging:
+    // log_debug("Registering metric: %s (multiplicator=%.2f)", name, multiplicator);
     std::lock_guard<std::mutex> lk(metrics_m);
     std::string s(name);
     MetricEntry &me = metrics[s];
     me.multiplicator = multiplicator;
     me.next_tick = 1.0; // Start sampling on first tick
-    log_debug("Metric registered: %s (total metrics now: %zu)", name, metrics.size());
+    // log_debug("Metric registered: %s (total metrics now: %zu)", name, metrics.size());
     return 0;
 }
 
