@@ -1,0 +1,231 @@
+﻿# Zabbix Aggplugin - Measurement Plugins Project
+
+## Project Overview
+Standalone project for building custom measurement plugin DLLs that extend Zabbix Aggplugin with custom system metrics.
+
+## Architecture
+- **Language:** C (for maximum portability and performance)
+- **API:** measurement_plugin_api.h defines interface contract
+- **Build:** MinGW64/GCC compiles to shared libraries (.dll/.so)
+- **Integration:** Aggplugin loads DLLs dynamically via LoadLibrary/dlopen
+
+## API Design
+
+### Required Functions
+1. `plugin_get_info()` - Returns metadata (name, version, metric keys)
+2. `plugin_init(config)` - Initialize resources, parse config
+3. `plugin_collect(results)` - Collect current measurements
+4. `plugin_deinit()` - Clean up resources
+
+### Optional Functions
+- `plugin_on_reset(key)` - Reset notification from collector
+- `plugin_aggregate_custom(...)` - Custom aggregation logic
+- `plugin_on_init_complete()` - Post-init hook
+
+### Data Structures
+- `plugin_info_t` - Plugin metadata with metric_key_info_t array
+- `collection_result_t` - Per-metric collection results
+- `measurement_value_t` - Individual measurements with source_id
+
+## Multi-Source Support
+
+**IMPORTANT:** Plugins return CURRENT VALUES only, not statistics.
+
+For metrics with multiple sources (e.g., per-disk I/O, per-CPU load):
+1. Set `has_multiple_sources = 1` in metric declaration
+2. In `plugin_collect()`, return current instantaneous value for each source
+3. Allocate measurement_value_t array (one per source)
+4. Assign unique source_id strings (e.g., "0", "1", "disk0", "core0")
+
+Aggplugin collector automatically:
+- Samples your plugin every 1 second
+- Accumulates values per source over time
+- Computes statistics (avg, min, max, median, mode, stddev, variance, count)
+- Returns aggregated statistics when Zabbix queries
+
+## Example Plugins
+
+### cpu_load_plugin.c
+- **Single-source:** System-wide CPU%
+- **Returns:** Current CPU utilization (0-100)
+- **Windows API:** GetSystemTimes() with delta calculation
+- **Baseline:** First call establishes baseline, subsequent calls return percentage
+
+### memory_usage_plugin.c
+- **Single-source:** Available physical memory in MB
+- **Returns:** Current available memory
+- **Windows API:** GlobalMemoryStatusEx()
+- **No baseline needed:** Instant measurement
+
+### disk_stats_plugin.c
+- **Multi-source:** Per-physical-disk I/O operations/sec
+- **Returns:** Current I/O rate for each disk
+- **Windows API:** PDH (Performance Data Helper)
+- **Locale-aware:** Uses PdhAddEnglishCounter for cross-locale compatibility
+- **Sources:** Disk numbers ("0", "1", "2", ...)
+
+## Memory Management
+
+**Plugin responsibilities:**
+- Allocate measurement_value_t arrays via malloc()
+- Allocate source_id strings via strdup()/malloc()
+- Return CURRENT values only (no statistics computation)
+
+**Aggplugin responsibilities:**
+- Call plugin_collect() every 1 second
+- Free measurement_value_t arrays after collection
+- Free all source_id and str_value strings
+- Accumulate values in per-source accumulators
+- Compute statistics (avg, min, max, median, mode, stddev, variance)
+- Generate JSON with aggregate and per-source statistics
+
+## Build Process
+
+**Windows (MinGW64):**
+```bash
+gcc -shared -o plugin.dll plugin.c -Wall -O2 -static-libgcc
+gcc -shared -o plugin.dll plugin.c -lPdh -Wall -O2  # For PDH-based plugins
+```
+
+**Linux (GCC):**
+```bash
+gcc -shared -fPIC -o plugin.so plugin.c -Wall -O2
+```
+
+## Deployment
+
+1. Build plugin DLL/SO
+2. Copy to Zabbix plugins directory
+3. Add to aggplugin.conf:
+   ```ini
+   Plugins.Aggplugin.PluginPath=C:\Zabbix\plugins\measurements\*.dll
+
+   [plugin_name.dll]
+   MetricKeys=metric1,metric2
+   ```
+4. Restart Zabbix Agent2
+
+## Integration with Aggplugin
+
+**Loading (Go  C++):**
+1. Go scans PluginPath pattern (main.go:collectDLLMetrics)
+2. LoadLibrary each DLL
+3. GetProcAddress("plugin_get_info")
+4. Extract metric keys
+5. Register with Zabbix SDK (plugin.RegisterMetrics)
+6. Register with C++ collector (collector_register_metric via CGO)
+
+**Collection (C++  DLL):**
+1. Collector sampling loop runs every 1 second (collector.cpp:collector_loop)
+2. Calls plugin_sample_multi_from_dll (plugin_loader.cpp)
+3. Calls DLL''s plugin_collect() - plugin returns CURRENT values
+4. Parses collection_result_t array
+5. Adds values to per-source accumulators (map<source_id, Accumulator>)
+
+**Querying (Zabbix  Go  C++):**
+1. Zabbix queries aggplugin.metric_key
+2. Go Export() receives key (main.go:Export)
+3. Calls collector_fetch_and_reset_json via CGO
+4. C++ computes statistics from accumulated samples
+5. Generates JSON with all+sources statistics
+6. Returns to Zabbix
+
+**Example Data Flow (disk.io.read with 2 disks):**
+
+Plugin returns (every 1 second):
+```c
+// plugin_collect() output
+values[0] = {source_id: "0", value: 42.5}  // Disk 0 current I/O rate
+values[1] = {source_id: "1", value: 28.3}  // Disk 1 current I/O rate
+```
+
+Zabbix receives (after 120 samples):
+```json
+{
+  "metric": "disk.io.read",
+  "values": {
+    "all": {"avg": 250.5, "min": 100, "max": 400, "cnt": 120},
+    "sources": {
+      "0": {"avg": 150.2, "min": 50, "max": 300, "cnt": 120},
+      "1": {"avg": 100.3, "min": 50, "max": 100, "cnt": 120}
+    }
+  }
+}
+```
+
+## Error Handling
+
+**Plugin errors:**
+- Return COLLECT_ERROR in collection_result_t.status
+- Set value_count = 0
+- Aggplugin skips failed metric, continues collection
+
+**Missing plugins:**
+- plugin_sample_multi_from_dll returns NULL with *ok=0
+- Falls back to plugin_sample_numeric (legacy)
+- Metric reports as unavailable
+
+## Performance Considerations
+
+**Sampling interval:** Base interval (default 1 second) × multiplicator
+**Memory per metric:** ~8KB (1000 samples × 8 bytes/double)
+**Multi-source overhead:** Linear with source count (O(sources × samples))
+
+## Future Enhancements
+
+- Per-DLL interval multipliers (custom sampling rates)
+- Dynamic source discovery (hot-plug USB drives, CPU hotswap)
+- String metric support (currently unused)
+- Linux implementations (PDH equivalent: /proc, sysfs)
+- Plugin health monitoring (crash detection, auto-reload)
+
+## File Structure
+
+```
+plugplugins/
+ measurement_plugin_api.h   # API interface definition
+ cpu_load_plugin.c          # Example: CPU load
+ memory_usage_plugin.c      # Example: Memory usage
+ disk_stats_plugin.c        # Example: Disk I/O (multi-source)
+ build.ps1                  # Build script (Windows)
+ build.sh                   # Build script (Linux)
+ README.md                  # This file
+ ai.txt                     # AI context
+ .gitignore                 # Git exclusions
+ ai_priv/                   # Private development notes (git-ignored)
+     ai_priv.txt
+```
+
+## Key Decisions
+
+1. **C language:** Maximum portability, minimal dependencies
+2. **Shared libraries:** Dynamic loading, no recompilation needed
+3. **Source IDs:** String-based for flexibility (disks, CPUs, NICs, etc.)
+4. **Memory ownership:** Clear allocation/free boundaries
+5. **Error isolation:** Plugin crashes don''t affect aggplugin
+6. **API versioning:** Reserved for future compatibility
+7. **Statistics computation:** Centralized in collector, not in plugins
+
+## Testing
+
+Test plugins using standalone aggplugin instance:
+```powershell
+cd aggplugin\build
+.\aggplugin-agent2.exe -test
+```
+
+Query metrics via zabbix_get:
+```bash
+zabbix_get -s localhost -p 10050 -k aggplugin.cpu_load
+zabbix_get -s localhost -p 10050 -k aggplugin.disk.io.read
+```
+
+Check debug log for collection details:
+```
+aggplugin_debug.log
+```
+
+## Contact
+
+Author: Claude Sonnet 4.5 (AI Assistant)
+Lead & Architecture: lukas@plachy.eu

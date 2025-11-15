@@ -1,0 +1,26 @@
+﻿# AI private development notes
+ai_priv/
+
+# Build artifacts
+*.dll
+*.so
+*.o
+*.obj
+*.exe
+*.lib
+*.a
+
+# Backup files
+*.bak
+*~
+*.swp
+
+# IDE files
+.vscode/
+.vs/
+*.user
+*.suo
+
+# OS files
+Thumbs.db
+.DS_Store
