@@ -53,14 +53,17 @@ Push-Location -Path (Join-Path $PSScriptRoot "cpp_agent_wrapper")
 try {
     $commonPath = Join-Path $PSScriptRoot "cpp_common"
     
-    # Detect zabbixlib location (portable: ../../../zabbixlib or ../../zabbixlib)
+    # Detect zabbixlib location (portable: Cpp/zabbixlib preferred)
+    # From cpp_agent_wrapper: ../../../zabbixlib (aggplugin → zabbix → Cpp)
     $zabbixInclude = ""
     if (Test-Path "$PWD/../../../zabbixlib/include") {
+        # Preferred location: Cpp/zabbixlib (neighbor to Cpp/zabbix)
         $zabbixInclude = "-I`"$PWD/../../../zabbixlib/include`""
-        Write-Host "Using zabbixlib from: $PWD/../../../zabbixlib/include"
-    } elseif (Test-Path "$PWD/../../../../zabbixlib/include") {
-        $zabbixInclude = "-I`"$PWD/../../../../zabbixlib/include`""
-        Write-Host "Using zabbixlib from: $PWD/../../../../zabbixlib/include"
+        Write-Host "Using zabbixlib from: Cpp/zabbixlib/include"
+    } elseif (Test-Path "$PWD/../../zabbixlib/include") {
+        # Alternative: inside aggplugin directory
+        $zabbixInclude = "-I`"$PWD/../../zabbixlib/include`""
+        Write-Host "Using zabbixlib from: aggplugin/zabbixlib/include"
     } else {
         Write-Warning "zabbixlib headers not found (optional for Go external plugin)"
     }
