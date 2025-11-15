@@ -55,7 +55,7 @@ try {
     
     if ($Variant -eq 'classic' -or $Variant -eq 'both') {
         Write-Host "Building classic agent DLL..."
-        g++ -shared -o "../build/aggplugin_classic.dll" unified_wrapper.cpp "$commonPath/plugin_common.cpp" "$commonPath/collector.cpp" -I"$PWD/../../../zabbixlib/include" -I"$commonPath" -DZABBIX_CLASSIC_AGENT -static-libgcc -static-libstdc++ -lpdh
+        g++ -shared -o "../build/aggplugin_classic.dll" unified_wrapper.cpp "$commonPath/plugin_common.cpp" "$commonPath/plugin_loader.cpp" "$commonPath/collector.cpp" -I"$PWD/../../../zabbixlib/include" -I"$commonPath" -DZABBIX_CLASSIC_AGENT -static-libgcc -static-libstdc++ -lpdh
         if ($LASTEXITCODE -ne 0) { throw "classic build failed" }
         Write-Host "Created build/aggplugin_classic.dll"
     }

@@ -164,6 +164,7 @@ var cfgMaxSamples = 1000                    // Maximum samples per metric before
 var cfgPreloadMetrics = "cpu_load,mem_free" // Comma-separated list of metrics to preload on startup
 var cfgPreloadDelay = 0.0                   // Seconds to wait for baseline (0 = no delay, immediate availability)
 var cfgPluginPath = ""                      // Path pattern for measurement plugin DLLs (e.g., C:\Zabbix\plugins\*.dll)
+var cfgDLLMetrics = make(map[string]string) // Map of [dllname.dll] → comma-separated metric keys
 
 // ========================================================================
 // MEASUREMENT PLUGIN LOADER
@@ -429,16 +430,17 @@ func (p *Plugin) Export(key string, params []string, context plugin.ContextProvi
 
 	debugLog(DBG_INFO, fmt.Sprintf("EXPORT CALLED: key=%s, params=%v", key, params))
 
-	// Handle internal metrics (built-in, no DLL required)
-	if strings.HasPrefix(key, "aggplugin._internal.") {
-		return p.handleInternalMetric(key, params)
+	// Handle built-in _internal metrics
+	if key == "aggplugin._internal.test" {
+		debugLog(DBG_VERBOSE, "Test metric - returning success")
+		return "Aggplugin connectivity test - OK", nil
 	}
 
-	// Strip "aggplugin." prefix to get collector metric name for DLL metrics
+	// Strip "aggplugin." prefix to get collector metric name
 	metricName := strings.TrimPrefix(key, "aggplugin.")
 
-	// For DLL metrics, fetch aggregated data from collector
-	debugLog(DBG_VERBOSE, fmt.Sprintf("Fetching aggregated data for DLL metric: %s", metricName))
+	// Fetch aggregated data from collector
+	debugLog(DBG_VERBOSE, fmt.Sprintf("Fetching aggregated data for metric: %s", metricName))
 
 	cMetricName := C.CString(metricName)
 	defer C.free(unsafe.Pointer(cMetricName))
@@ -457,48 +459,6 @@ func (p *Plugin) Export(key string, params []string, context plugin.ContextProvi
 }
 
 // handleInternalMetric processes built-in internal metrics (no DLL required)
-func (p *Plugin) handleInternalMetric(key string, params []string) (interface{}, error) {
-	debugLog(DBG_VERBOSE, fmt.Sprintf("Handling internal metric: %s", key))
-
-	switch key {
-	case "aggplugin._internal.test":
-		// Simple connectivity test - returns constant string
-		debugLog(DBG_VERBOSE, "Internal test metric - returning success")
-		return "Aggplugin internal test - connectivity OK", nil
-
-	case "aggplugin._internal.cpu_load":
-		// Built-in CPU load using plugin_common.cpp (fallback)
-		debugLog(DBG_VERBOSE, "Internal CPU load metric - using built-in implementation")
-		return p.fetchInternalMetric("_internal.cpu_load")
-
-	case "aggplugin._internal.mem_free":
-		// Built-in memory free using plugin_common.cpp (fallback)
-		debugLog(DBG_VERBOSE, "Internal memory metric - using built-in implementation")
-		return p.fetchInternalMetric("_internal.mem_free")
-
-	default:
-		return nil, fmt.Errorf("unknown internal metric: %s", key)
-	}
-}
-
-// fetchInternalMetric retrieves aggregated data for internal metrics from collector
-func (p *Plugin) fetchInternalMetric(metricName string) (interface{}, error) {
-	cMetricName := C.CString(metricName)
-	defer C.free(unsafe.Pointer(cMetricName))
-
-	buffer := make([]byte, 4096)
-	ret := C.collector_fetch_and_reset_json(cMetricName, (*C.char)(unsafe.Pointer(&buffer[0])), C.uint(len(buffer)))
-
-	if ret != 0 {
-		debugLog(DBG_ERROR, fmt.Sprintf("collector_fetch_and_reset_json failed for %s: %d", metricName, ret))
-		return nil, fmt.Errorf("failed to fetch internal metric %s: %d", metricName, ret)
-	}
-
-	result := string(buffer[:clen(buffer)])
-	debugLog(DBG_INFO, fmt.Sprintf("EXPORT: Returning internal metric %s: %d bytes", metricName, len(result)))
-	return result, nil
-}
-
 // callPluginCollect calls a measurement plugin's collect function and formats the result
 func callPluginCollect(plugin *LoadedPlugin, key string, params []string) (interface{}, error) {
 	debugLog(DBG_VERBOSE, fmt.Sprintf("Calling plugin_collect for plugin: %s", plugin.Info.Name))
@@ -564,19 +524,97 @@ func callPluginCollect(plugin *LoadedPlugin, key string, params []string) (inter
 }
 
 func init() {
-	// Register the plugin with Zabbix Agent2
-	// ARCHITECTURE: Two metric types:
-	//   1. INTERNAL METRICS (aggplugin._internal.*): Built-in, always available, no DLL required
-	//   2. DLL METRICS (aggplugin[*]): Dynamically discovered from loaded DLL plugins
-	//
-	// Internal metrics serve as: connectivity test, fallback when no DLLs, reference implementation
-	// DLL metrics are registered at runtime based on plugin_get_info() announcements
-	plugin.RegisterMetrics(&impl, pluginName,
-		"aggplugin._internal.test", "Internal connectivity test - returns constant success string.",
-		"aggplugin._internal.cpu_load", "Internal CPU load (fallback) - returns JSON with aggregation statistics.",
-		"aggplugin._internal.mem_free", "Internal memory free (fallback) - returns JSON with aggregation statistics.",
-		"aggplugin[*]", "Dynamic metrics from loaded DLL plugins - returns JSON with aggregation statistics.",
-	)
+	// Load configuration to populate cfgDLLMetrics map
+	loadConfig()
+}
+
+// collectDLLMetrics scans DLL plugins and collects their metric keys and descriptions
+func collectDLLMetrics() []string {
+	if cfgPluginPath == "" {
+		debugLog(DBG_WARNING, "PluginPath not configured - no DLL metrics will be registered")
+		return nil
+	}
+
+	matches, err := filepath.Glob(cfgPluginPath)
+	if err != nil {
+		debugLog(DBG_ERROR, fmt.Sprintf("Failed to glob plugin path '%s': %v", cfgPluginPath, err))
+		return nil
+	}
+
+	if len(matches) == 0 {
+		debugLog(DBG_WARNING, fmt.Sprintf("No DLL plugins found matching: %s", cfgPluginPath))
+		return nil
+	}
+
+	var metrics []string
+	debugLog(DBG_INFO, fmt.Sprintf("Scanning %d DLL plugin(s) for metrics...", len(matches)))
+
+	for _, dllPath := range matches {
+		// Temporarily load DLL to get plugin info
+		handle, err := syscall.LoadLibrary(dllPath)
+		if err != nil {
+			debugLog(DBG_WARNING, fmt.Sprintf("Failed to load DLL '%s': %v", dllPath, err))
+			continue
+		}
+
+		getInfoProc, err := syscall.GetProcAddress(handle, "plugin_get_info")
+		if err != nil {
+			debugLog(DBG_WARNING, fmt.Sprintf("DLL '%s' missing plugin_get_info: %v", dllPath, err))
+			syscall.FreeLibrary(handle)
+			continue
+		}
+
+		ret, _, _ := syscall.SyscallN(getInfoProc)
+		if ret == 0 {
+			debugLog(DBG_WARNING, fmt.Sprintf("DLL '%s' plugin_get_info returned NULL", dllPath))
+			syscall.FreeLibrary(handle)
+			continue
+		}
+
+		// Parse C struct (matching measurement_plugin_api.h CPluginInfo)
+		type CPluginInfo struct {
+			Name     *byte
+			Version  *byte
+			Author   *byte
+			KeyCount uint64
+			Keys     uintptr
+		}
+		cInfo := (*CPluginInfo)(unsafe.Pointer(ret))
+
+		// Parse metric keys array
+		type CMetricKeyInfo struct {
+			Key                *byte
+			Description        *byte
+			Type               int32
+			Parameters         *byte
+			HasMultipleSources int32
+		}
+
+		if cInfo.KeyCount > 0 && cInfo.Keys != 0 {
+			keysArray := unsafe.Slice((*CMetricKeyInfo)(unsafe.Pointer(cInfo.Keys)), cInfo.KeyCount)
+
+			for i := uint64(0); i < cInfo.KeyCount; i++ {
+				keyName := cStringToGo(keysArray[i].Key)
+				description := cStringToGo(keysArray[i].Description)
+
+				// Ensure description ends with period (SDK requirement)
+				if description != "" && !strings.HasSuffix(description, ".") {
+					description += "."
+				}
+
+				// Build full metric key with prefix
+				fullKey := "aggplugin." + keyName
+
+				metrics = append(metrics, fullKey, description)
+				debugLog(DBG_VERBOSE, fmt.Sprintf("Found metric: %s - %s", fullKey, description))
+			}
+		}
+
+		syscall.FreeLibrary(handle)
+	}
+
+	debugLog(DBG_INFO, fmt.Sprintf("Collected %d metric(s) from DLL plugins", len(metrics)/2))
+	return metrics
 }
 
 // debugLog writes to debug log file if message level <= configured level
@@ -642,11 +680,19 @@ func loadConfig() {
 		}
 
 		scanner := bufio.NewScanner(file)
+		currentSection := "" // Track [section] context
+
 		for scanner.Scan() {
 			line := strings.TrimSpace(scanner.Text())
 
 			// Skip comments and empty lines
 			if line == "" || strings.HasPrefix(line, "#") {
+				continue
+			}
+
+			// Check for [section] headers (e.g., [cpu_load_plugin.dll])
+			if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
+				currentSection = line[1 : len(line)-1]
 				continue
 			}
 
@@ -659,7 +705,14 @@ func loadConfig() {
 			key := strings.TrimSpace(parts[0])
 			value := strings.TrimSpace(parts[1])
 
-			// Match our config parameters
+			// Handle MetricKeys within [dllname.dll] sections
+			if currentSection != "" && key == "MetricKeys" {
+				cfgDLLMetrics[currentSection] = value
+				debugLog(DBG_INFO, fmt.Sprintf("Config: [%s] MetricKeys=%s (from %s)", currentSection, value, configPath))
+				continue
+			}
+
+			// Match global config parameters
 			switch key {
 			case "Plugins.Aggplugin.DebugLevel", "DebugLevel":
 				if level, err := strconv.Atoi(value); err == nil && level >= 0 && level <= 5 {
@@ -713,6 +766,9 @@ func checkNamedPipes() {
 func main() {
 	debugLog(DBG_INFO, "main() started")
 
+	// Ensure plugins are unloaded when main exits
+	defer unloadAllPlugins()
+
 	// Load configuration from config files
 	loadConfig()
 	debugLog(DBG_INFO, fmt.Sprintf("Configuration loaded: DebugLevel=%d, MaxSamples=%d, PreloadMetrics=%s, PreloadDelay=%.1f",
@@ -723,35 +779,25 @@ func main() {
 	C.collector_init(C.double(1.0))
 	debugLog(DBG_INFO, "Collector initialized")
 
-	// Register internal metrics (built-in fallbacks, always available)
-	debugLog(DBG_INFO, "Registering internal metrics...")
-	internalMetrics := []struct {
-		name string
-		mult float64
-	}{
-		{"_internal.cpu_load", 1.0},
-		{"_internal.mem_free", 1.0},
-	}
-	for _, metric := range internalMetrics {
-		cName := C.CString(metric.name)
-		ret := C.collector_register_metric(cName, C.double(metric.mult))
-		C.free(unsafe.Pointer(cName))
-		if ret != 0 {
-			debugLog(DBG_ERROR, fmt.Sprintf("Failed to register internal metric %s", metric.name))
-		} else {
-			debugLog(DBG_INFO, fmt.Sprintf("Registered internal metric: %s", metric.name))
-		}
-	}
-
 	// Load measurement plugins from DLLs
 	if err := loadMeasurementPlugins(); err != nil {
 		debugLog(DBG_ERROR, fmt.Sprintf("Failed to load measurement plugins: %v", err))
 	}
-	defer unloadAllPlugins()
 
-	// NOTE: Plugin metrics are now registered by loadMeasurementPlugins()
-	// Built-in metrics (cpu_load, mem_free) are now provided by plugins if loaded
-	// If no plugins, the collector will use the fallback built-in implementations
+	// Register all metrics with collector
+	debugLog(DBG_INFO, fmt.Sprintf("Registering %d plugin(s) with collector...", len(loadedPlugins)))
+	for _, loadedPlugin := range loadedPlugins {
+		for _, keyInfo := range loadedPlugin.Info.Keys {
+			cName := C.CString(keyInfo.Key)
+			ret := C.collector_register_metric(cName, C.double(1.0))
+			C.free(unsafe.Pointer(cName))
+			if ret != 0 {
+				debugLog(DBG_ERROR, fmt.Sprintf("Failed to register metric %s with collector", keyInfo.Key))
+			} else {
+				debugLog(DBG_VERBOSE, fmt.Sprintf("Registered metric with collector: %s", keyInfo.Key))
+			}
+		}
+	}
 
 	debugLog(DBG_INFO, "Metrics registered, collector sampling started")
 
@@ -793,10 +839,44 @@ func main() {
 		debugLog(DBG_INFO, "Collector stopped")
 	}()
 
-	// Check if plugin was registered
-	p, err := plugin.GetByName(pluginName)
+	// Build complete metric list: built-in _internal metrics + dynamically scanned DLL metrics
+	allMetrics := []string{
+		"aggplugin._internal.test", "Connectivity test - returns constant success string.",
+	}
+
+	// Scan DLL plugins to collect their metric keys
+	dllMetrics := collectDLLMetrics()
+	if dllMetrics != nil && len(dllMetrics) > 0 {
+		allMetrics = append(allMetrics, dllMetrics...)
+	}
+
+	// Register all metrics with Zabbix SDK in main()
+	// Note: Descriptions MUST end with period, keys must be valid format
+	metricCount := len(allMetrics) / 2
+	debugLog(DBG_INFO, fmt.Sprintf("Registering %d metric(s) with Zabbix SDK in main()", metricCount))
+
+	if metricCount == 0 {
+		debugLog(DBG_ERROR, "No metrics to register!")
+		panic("No metrics to register")
+	}
+
+	err := plugin.RegisterMetrics(&impl, pluginName, allMetrics...)
+
 	if err != nil {
-		debugLog(DBG_ERROR, fmt.Sprintf("GetByName FAILED: %v", err))
+		debugLog(DBG_ERROR, fmt.Sprintf("RegisterMetrics FAILED: %v", err))
+		debugLog(DBG_ERROR, "Attempted to register metrics:")
+		for i := 0; i < len(allMetrics); i += 2 {
+			debugLog(DBG_ERROR, fmt.Sprintf("  - %s: %s", allMetrics[i], allMetrics[i+1]))
+		}
+		panic(err)
+	}
+
+	debugLog(DBG_INFO, fmt.Sprintf("Successfully registered %d metric(s)", metricCount))
+
+	// Check if plugin was registered
+	p, err2 := plugin.GetByName(pluginName)
+	if err2 != nil {
+		debugLog(DBG_ERROR, fmt.Sprintf("GetByName FAILED: %v", err2))
 	} else {
 		debugLog(DBG_VERBOSE, fmt.Sprintf("GetByName OK: %v", p))
 	}

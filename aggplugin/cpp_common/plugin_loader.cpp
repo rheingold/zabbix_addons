@@ -125,12 +125,18 @@ double plugin_sample_from_dll(const char* metric_key, int* ok) {
         
         // Assume this is our key (in order)
         if (i == entry.key_index) {
-            // Get first value (for single-source metrics)
+            // For now, just return first value - multi-source support needs collector changes
+            // TODO: Return all values with source_ids to collector for proper multi-source aggregation
             if (results[i].values) {
                 *ok = 1;
                 double value = results[i].values[0].value;
                 
-                // Free the values array (plugin allocated it)
+                // Free source_id strings and values array
+                for (size_t v = 0; v < results[i].value_count; v++) {
+                    if (results[i].values[v].source_id) {
+                        free((void*)results[i].values[v].source_id);
+                    }
+                }
                 free(results[i].values);
                 
                 return value;
@@ -139,4 +145,106 @@ double plugin_sample_from_dll(const char* metric_key, int* ok) {
     }
     
     return 0.0;
+}
+
+/*
+ * plugin_sample_multi_from_dll - Implementation (see plugin_loader.hpp for full docs)
+ */
+multi_source_result_t* plugin_sample_multi_from_dll(
+    const char* metric_key,
+    size_t* result_count,
+    int* ok
+) {
+    *ok = 0;
+    *result_count = 0;
+    if (!metric_key) return nullptr;
+    
+    std::lock_guard<std::mutex> lock(plugin_registry_mutex);
+    
+    std::string key(metric_key);
+    auto it = plugin_registry.find(key);
+    if (it == plugin_registry.end()) {
+        return nullptr;  // Not a plugin metric
+    }
+    
+    PluginEntry& entry = it->second;
+    
+    // Get the plugin_collect function from the DLL
+    typedef size_t (*plugin_collect_func)(void*);
+    plugin_collect_func collect = nullptr;
+    
+    #ifdef _WIN32
+        collect = (plugin_collect_func)GetProcAddress((HMODULE)entry.dll_handle, "plugin_collect");
+    #else
+        collect = (plugin_collect_func)dlsym(entry.dll_handle, "plugin_collect");
+    #endif
+    
+    if (!collect) {
+        return nullptr;  // Function not found in DLL
+    }
+    
+    // Allocate results array (assume max 10 keys per plugin for simplicity)
+    collection_result_t results[10];
+    memset(results, 0, sizeof(results));
+    
+    // Call plugin_collect from DLL
+    size_t plugin_result_count = 0;
+    try {
+        plugin_result_count = collect(results);
+    } catch (...) {
+        return nullptr;  // Plugin crashed or threw exception
+    }
+    
+    if (plugin_result_count == 0) {
+        return nullptr;
+    }
+    
+    // Find the result for our key_index
+    for (size_t i = 0; i < plugin_result_count && i < 10; i++) {
+        if (results[i].status != COLLECT_OK) continue;
+        if (results[i].value_count == 0) continue;
+        
+        // Check if this is our key
+        if (i == entry.key_index) {
+            if (!results[i].values) continue;
+            
+            // Allocate return array
+            multi_source_result_t* ret = (multi_source_result_t*)malloc(
+                sizeof(multi_source_result_t) * results[i].value_count);
+            
+            if (!ret) {
+                // Cleanup and fail
+                for (size_t v = 0; v < results[i].value_count; v++) {
+                    if (results[i].values[v].source_id) {
+                        free((void*)results[i].values[v].source_id);
+                    }
+                }
+                free(results[i].values);
+                return nullptr;
+            }
+            
+            // Copy all values with source IDs
+            for (size_t v = 0; v < results[i].value_count; v++) {
+                ret[v].value = results[i].values[v].value;
+                
+                // Transfer ownership of source_id (or create default)
+                if (results[i].values[v].source_id) {
+                    ret[v].source_id = (char*)results[i].values[v].source_id;
+                } else {
+                    // Single-source metric: use empty string
+                    ret[v].source_id = (char*)malloc(1);
+                    ret[v].source_id[0] = '\0';
+                }
+            }
+            
+            // Free the original values array (source_ids transferred)
+            free(results[i].values);
+            
+            *result_count = results[i].value_count;
+            *ok = 1;
+            return ret;
+        }
+    }
+    
+    return nullptr;
 }

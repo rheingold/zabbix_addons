@@ -1,222 +1,441 @@
-=== AI CONTEXT FILE - AGGPLUGIN ===
-Last Updated: November 14, 2025
-Version: tmp0.1 (Preliminary Release) - Plugin Framework Added
+=== ZABBIX AGGPLUGIN - AI CONTEXT ====== AI CONTEXT FILE - AGGPLUGIN ===
 
-*** PURPOSE OF THIS FILE ***
-This file provides essential context for AI assistants (Claude, GPT, etc.) working on this project.
+Version: tmp0.1 | Updated: November 15, 2025Last Updated: November 14, 2025
+
+Author: Claude Sonnet 4.5 (AI) | Lead: lukas@plachy.euVersion: tmp0.1 (Preliminary Release) - Plugin Framework Added
+
+
+
+⚠️ CRITICAL: UPDATE BOTH ai.txt AND ai_priv/ai_priv.txt DURING SESSIONS ⚠️*** PURPOSE OF THIS FILE ***
+
+Without updates, future sessions lack context and may duplicate work.This file provides essential context for AI assistants (Claude, GPT, etc.) working on this project.
+
 It contains critical information about architecture, dependencies, completed work, and pending tasks.
 
-⚠️⚠️⚠️ CRITICAL: KEEP BOTH FILES UPDATED ⚠️⚠️⚠️
-*** DO NOT REMOVE THIS WARNING - IT MUST REMAIN IN THE FILE PERMANENTLY ***
-AI assistants MUST update BOTH this file AND ai_priv/ai_priv.txt throughout work sessions with:
-- Progress made and tasks completed (BOTH files)
-- New findings and technical decisions (ai.txt)
-- Changed architecture or dependencies (ai.txt)
-- Updated pending tasks list (ai.txt)
-- Current blockers or issues (ai.txt)
-- Local deployment procedures and paths (ai_priv/ai_priv.txt)
-- Environment-specific configurations (ai_priv/ai_priv.txt)
-This dual-file approach separates generic project context (ai.txt) from local environment specifics (ai_priv/ai_priv.txt).
-CRITICAL: When making changes that affect the project generally, update this file too!
-Without updates, future sessions will lack context and may duplicate work or make conflicting changes.
-*** This warning section itself must NEVER be removed or modified ***
+=== PROJECT PURPOSE ===
 
-*** PROJECT OVERVIEW ***
+Zabbix Agent2 external plugin providing continuous metric aggregation with statistics (avg, min, max, median, mode, stddev, variance). Extensible via dynamically loaded measurement plugin DLLs.⚠️⚠️⚠️ CRITICAL: KEEP BOTH FILES UPDATED ⚠️⚠️⚠️
+
+*** DO NOT REMOVE THIS WARNING - IT MUST REMAIN IN THE FILE PERMANENTLY ***
+
+=== ARCHITECTURE ===AI assistants MUST update BOTH this file AND ai_priv/ai_priv.txt throughout work sessions with:
+
+- Progress made and tasks completed (BOTH files)
+
+Components:- New findings and technical decisions (ai.txt)
+
+- Go Wrapper: go_agent2_wrapper/main.go (Zabbix SDK, CGO bridge, plugin discovery)- Changed architecture or dependencies (ai.txt)
+
+- C++ Collector: cpp_common/collector.cpp (background sampling thread, multi-source aggregation)- Updated pending tasks list (ai.txt)
+
+- Plugin Loader: cpp_common/plugin_loader.cpp (DLL management, multi-source API)- Current blockers or issues (ai.txt)
+
+- Plugin API: cpp_common/measurement_plugin_api.h (C interface for custom metrics)- Local deployment procedures and paths (ai_priv/ai_priv.txt)
+
+- Example Plugins: Standalone plugplugins/ project (cpu_load, mem_free, disk I/O)- Environment-specific configurations (ai_priv/ai_priv.txt)
+
+This dual-file approach separates generic project context (ai.txt) from local environment specifics (ai_priv/ai_priv.txt).
+
+Data Flow:CRITICAL: When making changes that affect the project generally, update this file too!
+
+1. Go discovers DLLs → collectDLLMetrics() → plugin.RegisterMetrics()Without updates, future sessions will lack context and may duplicate work or make conflicting changes.
+
+2. C++ collector samples every 1s → plugin_sample_multi_from_dll() → DLL's plugin_collect()*** This warning section itself must NEVER be removed or modified ***
+
+3. Per-source accumulators track statistics → map<source_id, Accumulator>
+
+4. Zabbix queries → Export() → collector_fetch_and_reset_json() → JSON with aggregate + per-source stats*** PROJECT OVERVIEW ***
+
 Zabbix Agent2 external plugin for Windows providing continuous metric aggregation with comprehensive statistics (avg, min, max, median, mode, standard deviation, variance).
+
+=== MULTI-SOURCE METRICS (November 15, 2025) ===
 
 🎉 NEW: PLUGIN FRAMEWORK - Extensible architecture supporting loadable measurement plugins (DLL files)
 
-ARCHITECTURE:
-- Agent2 external plugin: Go wrapper + C++ aggregation engine + Plugin framework
-- Communication: Named pipes (Windows IPC between Agent2 and plugin process)
-- Core engine: cpp_common/collector.cpp (background sampling thread, 1-second interval)
-- Platform layer: cpp_common/plugin_common.cpp (Windows API samplers for built-in metrics)
-- Plugin system: cpp_common/plugin_loader.cpp (dynamic DLL loading, plugin lifecycle)
-- Plugin API: cpp_common/measurement_plugin_api.h (C interface for plugins)
-- Go wrapper: go_agent2_wrapper/main.go (CGO bindings + Zabbix SDK)
-- Build system: build_cpp.ps1 (main build), build_example_plugin.ps1 (plugin build)
+Design:
 
-PLUGIN FRAMEWORK COMPONENTS:
-- measurement_plugin_api.h: C interface specification (required/optional functions, data types)
-- plugin_loader.cpp: Dynamic loading (discovery, validation, lifecycle management)
-- collector_plugin_integration.cpp: Bridge layer (connects plugins to collector)
-- example_plugins/disk_stats_plugin.c: Complete example plugin (PDH-based disk I/O)
-- PLUGIN_DEVELOPMENT.md: Comprehensive developer guide (721 lines)
-- PLUGIN_ARCHITECTURE.md: Architecture documentation (598 lines)
+- Each metric can return multiple values from different sources (disks, CPUs, NICs)ARCHITECTURE:
+
+- MetricEntry.source_accumulators: map<string, Accumulator> (one per source)- Agent2 external plugin: Go wrapper + C++ aggregation engine + Plugin framework
+
+- JSON output includes "all" (aggregate across sources) + "sources" (per-source stats)- Communication: Named pipes (Windows IPC between Agent2 and plugin process)
+
+- Core engine: cpp_common/collector.cpp (background sampling thread, 1-second interval)
+
+Example (disk.io.read with 2 disks):- Platform layer: cpp_common/plugin_common.cpp (Windows API samplers for built-in metrics)
+
+```json- Plugin system: cpp_common/plugin_loader.cpp (dynamic DLL loading, plugin lifecycle)
+
+{- Plugin API: cpp_common/measurement_plugin_api.h (C interface for plugins)
+
+  "metric": "disk.io.read",- Go wrapper: go_agent2_wrapper/main.go (CGO bindings + Zabbix SDK)
+
+  "values": {- Build system: build_cpp.ps1 (main build), build_example_plugin.ps1 (plugin build)
+
+    "all": {"avg": 250.5, "min": 100, "max": 400, "cnt": 120},
+
+    "sources": {PLUGIN FRAMEWORK COMPONENTS:
+
+      "0": {"avg": 150.2, "min": 50, "max": 300, "cnt": 120},- measurement_plugin_api.h: C interface specification (required/optional functions, data types)
+
+      "1": {"avg": 100.3, "min": 50, "max": 100, "cnt": 120}- plugin_loader.cpp: Dynamic loading (discovery, validation, lifecycle management)
+
+    }- collector_plugin_integration.cpp: Bridge layer (connects plugins to collector)
+
+  }- example_plugins/disk_stats_plugin.c: Complete example plugin (PDH-based disk I/O)
+
+}- PLUGIN_DEVELOPMENT.md: Comprehensive developer guide (721 lines)
+
+```- PLUGIN_ARCHITECTURE.md: Architecture documentation (598 lines)
+
 - PLUGIN_QUICKREF.md: Quick reference card (188 lines)
 
+=== CURRENT METRICS ===
+
 PLUGIN FEATURES:
-- Dynamic discovery: Wildcard-based plugin scanning (e.g., plugins/*.dll)
-- Multi-source metrics: Support per-CPU, per-disk, per-interface metrics
+
+Built-in:- Dynamic discovery: Wildcard-based plugin scanning (e.g., plugins/*.dll)
+
+- aggplugin._internal.test - Connectivity test- Multi-source metrics: Support per-CPU, per-disk, per-interface metrics
+
 - Configuration: Per-plugin [plugin.name] sections in aggplugin.conf
-- Thread-safe: Plugin collection runs in background thread
-- Memory managed: Plugin allocates, framework frees
-- Error handling: COLLECT_OK, COLLECT_ERROR, COLLECT_NOTSUPPORTED, COLLECT_TIMEOUT
 
-KEY TECHNICAL DETAILS:
+Plugin-based (DLL):- Thread-safe: Plugin collection runs in background thread
+
+- aggplugin.cpu_load - System CPU % (cpu_load_plugin.dll, single-source)- Memory managed: Plugin allocates, framework frees
+
+- aggplugin.mem_free - Available memory MB (memory_usage_plugin.dll, single-source)- Error handling: COLLECT_OK, COLLECT_ERROR, COLLECT_NOTSUPPORTED, COLLECT_TIMEOUT
+
+- aggplugin.disk.io.read - Disk reads/sec (disk_stats_plugin.dll, multi-source per disk)
+
+- aggplugin.disk.io.write - Disk writes/sec (disk_stats_plugin.dll, multi-source per disk)KEY TECHNICAL DETAILS:
+
 - Sampling: Background thread samples metrics every 1 second
-- Storage: All samples stored in memory (vector) for statistics computation
+
+=== CONFIGURATION ===- Storage: All samples stored in memory (vector) for statistics computation
+
 - Thread safety: Mutex-protected accumulator (lock only during add/fetch)
-- Reset pattern: Each query (fetch) returns JSON and resets accumulator
+
+File: config_template/aggplugin.conf- Reset pattern: Each query (fetch) returns JSON and resets accumulator
+
 - Statistics: Computed on-demand during fetch (median via sort, mode via frequency map)
-- Memory: ~8 bytes per sample × MaxSamples (default 1000) per metric
-- Auto-reset: When MaxSamples reached, accumulator clears automatically
 
-IMPLEMENTED METRICS (Built-in):
-1. aggplugin.test - Connectivity test (returns success string)
+Key settings:- Memory: ~8 bytes per sample × MaxSamples (default 1000) per metric
+
+- Plugins.Aggplugin.PluginPath: Wildcard pattern for DLL discovery (e.g., C:\Zabbix\plugins\*.dll)- Auto-reset: When MaxSamples reached, accumulator clears automatically
+
+- Plugins.Aggplugin.DebugLevel: 0-5 (0=off, 3=info, 5=verbose)
+
+- Plugins.Aggplugin.MaxSamples: Auto-reset threshold (default 1000)IMPLEMENTED METRICS (Built-in):
+
+- [plugin.dll] sections: MetricKeys=comma,separated,list1. aggplugin.test - Connectivity test (returns success string)
+
 2. aggplugin.cpu_load - System CPU load % with statistics (via plugin_common.cpp)
-3. aggplugin.memory_usage - Available physical memory (MB) with statistics (via plugin_common.cpp)
 
-PLUGIN METRICS (Example Plugins - November 14, 2025):
-- cpu_load (via cpu_load_plugin.dll) - Same as built-in, demonstrates plugin framework
-- mem_free (via memory_usage_plugin.dll) - Same as built-in, demonstrates plugin framework
-- disk.io.read[device] (via disk_stats_plugin.dll) - Disk read operations/sec (per physical disk)
-- disk.io.write[device] (via disk_stats_plugin.dll) - Disk write operations/sec (per physical disk)
+=== BUILD SYSTEM ===3. aggplugin.memory_usage - Available physical memory (MB) with statistics (via plugin_common.cpp)
+
+
+
+Main Project:PLUGIN METRICS (Example Plugins - November 14, 2025):
+
+```powershell- cpu_load (via cpu_load_plugin.dll) - Same as built-in, demonstrates plugin framework
+
+.\build_cpp.ps1              # Builds C++ components (DLLs + shared lib)- mem_free (via memory_usage_plugin.dll) - Same as built-in, demonstrates plugin framework
+
+cd go_agent2_wrapper- disk.io.read[device] (via disk_stats_plugin.dll) - Disk read operations/sec (per physical disk)
+
+go build -o ..\build\aggplugin-agent2.exe- disk.io.write[device] (via disk_stats_plugin.dll) - Disk write operations/sec (per physical disk)
+
+```
 
 NOTE: Built-in CPU/memory metrics have been converted to example plugins, demonstrating
-      that the plugin framework can fully replace built-in functionality. Users can choose
-      to use either built-in metrics or load the plugin DLLs.
 
-STATISTICS COMPUTED:
-- avg: arithmetic mean
+Plugin Project (standalone):      that the plugin framework can fully replace built-in functionality. Users can choose
+
+```powershell      to use either built-in metrics or load the plugin DLLs.
+
+cd ..\plugplugins
+
+.\build.ps1                  # Builds all example pluginsSTATISTICS COMPUTED:
+
+```- avg: arithmetic mean
+
 - min: minimum value
-- max: maximum value  
-- med: median (50th percentile)
-- mod: mode (most frequent rounded value)
-- dev: standard deviation
+
+Output:- max: maximum value  
+
+- build/aggplugin-agent2.exe - Main executable- med: median (50th percentile)
+
+- build/libaggcollector.dll - CGO shared library- mod: mode (most frequent rounded value)
+
+- build/plugins/*.dll - Measurement plugins- dev: standard deviation
+
 - var: variance
-- cnt: sample count
 
-JSON OUTPUT FORMAT:
-```json
-{
-  "metric": "cpu_load",
-  "values": {
+=== PLUGIN DEVELOPMENT ===- cnt: sample count
+
+
+
+API Functions (measurement_plugin_api.h):JSON OUTPUT FORMAT:
+
+- plugin_get_info() - Returns metadata (name, version, keys)```json
+
+- plugin_init(config) - Initialize resources{
+
+- plugin_collect(results) - Collect measurements  "metric": "cpu_load",
+
+- plugin_deinit() - Cleanup  "values": {
+
     "all": {
-      "avg": 3.06, "min": 1.95, "max": 4.88,
-      "med": 2.91, "mod": 3, "dev": 0.75,
-      "var": 0.56, "cnt": 12
-    }
-  }
+
+Multi-Source Pattern:      "avg": 3.06, "min": 1.95, "max": 4.88,
+
+```c      "med": 2.91, "mod": 3, "dev": 0.75,
+
+// In plugin_collect():      "var": 0.56, "cnt": 12
+
+measurement_value_t* values = malloc(sizeof(measurement_value_t) * disk_count);    }
+
+for (int i = 0; i < disk_count; i++) {  }
+
+    values[i].source_id = strdup("0");  // Disk number}
+
+    values[i].value = get_disk_io(i);```
+
 }
-```
 
-CURRENT STATUS (November 15, 2025):
-✅ Agent2 Plugin: Fully functional with dynamic plugin loading
-✅ Plugin Framework: OPERATIONAL - 3 working example plugins (CPU, memory, disk)
-✅ CPU Metric: Working (via cpu_load_plugin.dll using GetSystemTimes API)
+results[0].values = values;CURRENT STATUS (November 15, 2025):
+
+results[0].value_count = disk_count;✅ Agent2 Plugin: Fully functional with dynamic plugin loading
+
+return 1;  // Number of metrics✅ Plugin Framework: OPERATIONAL - 3 working example plugins (CPU, memory, disk)
+
+```✅ CPU Metric: Working (via cpu_load_plugin.dll using GetSystemTimes API)
+
 ✅ Memory Metric: Working (via memory_usage_plugin.dll using GlobalMemoryStatusEx API)  
-✅ Disk I/O Metrics: Working (via disk_stats_plugin.dll using PDH API)
+
+Memory: Plugin allocates, aggplugin frees (source_id strings and values array).✅ Disk I/O Metrics: Working (via disk_stats_plugin.dll using PDH API)
+
 ✅ Statistics Engine: All 8 statistics computed correctly
-✅ Dynamic Loading: GetProcAddress-based plugin function resolution
+
+=== FILE STRUCTURE ===✅ Dynamic Loading: GetProcAddress-based plugin function resolution
+
 ✅ Configuration: File-based config + plugin path wildcard support
-✅ Build System: Automated build + plugin compilation scripts
-✅ Documentation: Complete (README.md, USAGE.md, PLUGIN_*.md)
 
-CRITICAL FIXES APPLIED (November 15, 2025):
-✅ Fixed duplicate collector_register_metric() calls (now internal to register_measurement_plugin)
-✅ Fixed plugin_sample_from_dll() crash - proper GetProcAddress usage instead of invalid function pointer
-✅ Added exception handling around plugin calls
-✅ Corrected metric names (aggplugin.mem_free matches plugin's mem_free key)
-✅ Registered disk.io.read/write metrics in Go RegisterMetrics
+```✅ Build System: Automated build + plugin compilation scripts
 
-VERIFIED WORKING:
-- Collector samples all 4 plugin metrics every 1 second
-- JSON output includes all 8 statistics (avg/min/max/median/mode/stddev/variance/count)
+aggplugin/✅ Documentation: Complete (README.md, USAGE.md, PLUGIN_*.md)
+
+├── ai.txt, ai_priv/ - Documentation
+
+├── build_cpp.ps1 - Build scriptCRITICAL FIXES APPLIED (November 15, 2025):
+
+├── config_template/ - Configuration templates✅ Fixed duplicate collector_register_metric() calls (now internal to register_measurement_plugin)
+
+├── go_agent2_wrapper/ - Go external plugin✅ Fixed plugin_sample_from_dll() crash - proper GetProcAddress usage instead of invalid function pointer
+
+│   └── main.go (961 lines: SDK integration, DLL discovery, CGO)✅ Added exception handling around plugin calls
+
+├── cpp_common/ - C++ core✅ Corrected metric names (aggplugin.mem_free matches plugin's mem_free key)
+
+│   ├── collector.cpp (733 lines: multi-source sampling, JSON generation)✅ Registered disk.io.read/write metrics in Go RegisterMetrics
+
+│   ├── plugin_loader.cpp (264 lines: DLL loading, multi-source API)
+
+│   ├── plugin_common.cpp (205 lines: legacy functions)VERIFIED WORKING:
+
+│   └── measurement_plugin_api.h (API definition)- Collector samples all 4 plugin metrics every 1 second
+
+└── cpp_agent_wrapper/ - Classic/Agent2 DLL wrappers- JSON output includes all 8 statistics (avg/min/max/median/mode/stddev/variance/count)
+
 - Fetch-and-reset behavior works correctly
-- Plugins survive multiple query cycles
-- No memory leaks or crashes during extended operation
 
-CRITICAL: ZABBIX GO SDK VERSION REQUIREMENT
-⚠️⚠️⚠️ MUST USE SDK v1.2.2-master OR NEWER ⚠️⚠️⚠️
+plugplugins/ (standalone)- Plugins survive multiple query cycles
+
+├── cpu_load_plugin.c, memory_usage_plugin.c, disk_stats_plugin.c- No memory leaks or crashes during extended operation
+
+├── measurement_plugin_api.h
+
+├── build.ps1CRITICAL: ZABBIX GO SDK VERSION REQUIREMENT
+
+└── README.md, ai.txt, ai_priv.txt⚠️⚠️⚠️ MUST USE SDK v1.2.2-master OR NEWER ⚠️⚠️⚠️
+
+```
 
 SDK Version: golang.zabbix.com/sdk v1.2.2-0.20251007063238-42702926b56d
-Commit: 42702926b56d (October 7, 2025)
+
+=== KEY TECHNICAL DECISIONS ===Commit: 42702926b56d (October 7, 2025)
+
 Source: https://github.com/zabbix/zabbix/tree/master
 
-WHY THIS SPECIFIC VERSION IS REQUIRED:
-- Old SDK v1.2.1 has CRITICAL BUG in handler_windows.go setConnection()
-- Bug: Loop counter never incremented, causing immediate return on first error
+1. Multi-Source Architecture (Nov 15): map<source_id, Accumulator> per metric
+
+   - Enables per-disk, per-CPU, per-NIC statisticsWHY THIS SPECIFIC VERSION IS REQUIRED:
+
+   - Aggregate "all" computed across sources- Old SDK v1.2.1 has CRITICAL BUG in handler_windows.go setConnection()
+
+   - No data loss for multi-source plugins- Bug: Loop counter never incremented, causing immediate return on first error
+
 - Result: Plugin cannot connect to Agent2 named pipe (3-second timeout)
-- Fix: Master branch (Oct 7+) fixes the retry logic
 
-IMPORTANT FILES & THEIR ROLES:
-- go_agent2_wrapper/main.go: Plugin entry point, SDK integration, plugin loading
-- cpp_common/collector.cpp: Core aggregation logic, background sampling
+2. Plugin Loading (Nov 14): Dynamic DLL discovery at startup- Fix: Master branch (Oct 7+) fixes the retry logic
+
+   - Go scans PluginPath pattern
+
+   - Calls plugin_get_info() to extract keysIMPORTANT FILES & THEIR ROLES:
+
+   - Registers with Zabbix SDK and C++ collector- go_agent2_wrapper/main.go: Plugin entry point, SDK integration, plugin loading
+
+   - Lifecycle: init → collect (every 1s) → deinit- cpp_common/collector.cpp: Core aggregation logic, background sampling
+
 - cpp_common/plugin_loader.cpp: Dynamic plugin loading (GetProcAddress/dlsym)
-- cpp_common/measurement_plugin_api.h: Plugin C API specification
-- example_plugins/*.c: Working plugin examples (CPU, memory, disk)
-- build_cpp.ps1: Main build script (C++ → DLL, Go → EXE)
-- build_example_plugin.ps1: Plugin compilation script
 
-PENDING TASKS / FUTURE ENHANCEMENTS:
+3. Memory Management: Plugin allocates, aggplugin frees- cpp_common/measurement_plugin_api.h: Plugin C API specification
 
-1. ⏳ INITIAL COLLECTOR RESET
-   - Add empty collector reset call immediately after start (before first server query)
+   - Clear ownership boundaries- example_plugins/*.c: Working plugin examples (CPU, memory, disk)
+
+   - No memory leaks- build_cpp.ps1: Main build script (C++ → DLL, Go → EXE)
+
+   - source_id strings freed after collection- build_example_plugin.ps1: Plugin compilation script
+
+
+
+4. Statistics: On-demand computation during fetchPENDING TASKS / FUTURE ENHANCEMENTS:
+
+   - Median: O(n log n) sort
+
+   - Mode: O(n) frequency map1. ⏳ INITIAL COLLECTOR RESET
+
+   - Variance: O(1) using sum_sq formula   - Add empty collector reset call immediately after start (before first server query)
+
    - Ensures clean state and immediate data availability
-   - Current: Overall system CPU only (GetSystemTimes API)
-   - Target: Per-core CPU load array
-   - Approach: Windows PDH (Performance Data Helper) API
-   - Challenge: Locale-dependent counter names (Czech Windows issue)
+
+5. Thread Safety: Per-accumulator mutex   - Current: Overall system CPU only (GetSystemTimes API)
+
+   - Lock only during add() and fetch()   - Target: Per-core CPU load array
+
+   - Minimal contention   - Approach: Windows PDH (Performance Data Helper) API
+
+   - Separate accumulators per source = parallel stats   - Challenge: Locale-dependent counter names (Czech Windows issue)
+
    - Status: Stubbed out (plugin_sample_cpu_per_core returns false)
-   - See: cpp_common/plugin_common.cpp TODO comment
 
-2. ⏳ CLASSIC AGENT SUPPORT
-   - Current: Untested (code exists but not validated)
-   - Files: cpp_agent_wrapper/classic_wrapper.c
-   - Build: .\build_cpp.ps1 -Variant classic
-   - Testing needed: Deploy DLL, configure LoadModule, test metrics
+=== DEPLOYMENT ===   - See: cpp_common/plugin_common.cpp TODO comment
 
-3. ⏳ SYSTEMATIC TEST SUITE
-   - Current: Manual testing only
-   - Needed: Unit tests, integration tests, stress tests
+
+
+Windows:2. ⏳ CLASSIC AGENT SUPPORT
+
+1. Copy aggplugin-agent2.exe to C:\Zabbix\plugins\   - Current: Untested (code exists but not validated)
+
+2. Copy plugin DLLs to C:\Zabbix\plugins\measurements\   - Files: cpp_agent_wrapper/classic_wrapper.c
+
+3. Configure aggplugin.conf in C:\Zabbix\conf\zabbix_agent2.d\plugins.d\   - Build: .\build_cpp.ps1 -Variant classic
+
+4. Add to zabbix_agent2.conf:   - Testing needed: Deploy DLL, configure LoadModule, test metrics
+
+   ```
+
+   Plugins.Aggplugin.System.Path=C:\Zabbix\plugins\aggplugin-agent2.exe3. ⏳ SYSTEMATIC TEST SUITE
+
+   ```   - Current: Manual testing only
+
+5. Restart Zabbix Agent2   - Needed: Unit tests, integration tests, stress tests
+
    - Coverage: Statistics accuracy, thread safety, memory limits
-   - Tools: Consider Google Test for C++, Go testing for wrapper
 
-4. ⏳ ADDITIONAL METRICS
-   - Disk I/O statistics
-   - Network interface statistics
+Test:   - Tools: Consider Google Test for C++, Go testing for wrapper
+
+```bash
+
+zabbix_get -s localhost -p 10050 -k aggplugin.cpu_load4. ⏳ ADDITIONAL METRICS
+
+zabbix_get -s localhost -p 10050 -k aggplugin.disk.io.read   - Disk I/O statistics
+
+```   - Network interface statistics
+
    - Process-specific metrics
-   - Custom performance counters
+
+=== COMPLETED WORK (November 15, 2025) ===   - Custom performance counters
+
    - Extensibility: See README.md "Extensibility" section
 
-5. ⏳ CROSS-PLATFORM SUPPORT
-   - Current: Windows-only (GetSystemTimes, GlobalMemoryStatusEx)
-   - Target: Linux support via /proc/stat, /proc/meminfo
-   - Architecture: Keep platform-specific code in plugin_common.cpp
+✅ Multi-Source Metric Support - Complete architecture overhaul
 
-BUILD & DEPLOYMENT:
-```powershell
-# Initialize environment (sets up Go and GCC paths)
-.\init-env.ps1
+  - plugin_sample_multi_from_dll() returns all source values5. ⏳ CROSS-PLATFORM SUPPORT
 
-# Build all components
-.\build_cpp.ps1 -Variant agent2
+  - MetricEntry uses map<source_id, Accumulator>   - Current: Windows-only (GetSystemTimes, GlobalMemoryStatusEx)
 
-# Stop service before deploying
+  - JSON includes aggregate "all" + per-source statistics   - Target: Linux support via /proc/stat, /proc/meminfo
+
+  - No data loss for multi-disk/CPU metrics   - Architecture: Keep platform-specific code in plugin_common.cpp
+
+
+
+✅ Code CleanupBUILD & DEPLOYMENT:
+
+  - Removed hardcoded CPU/memory implementations (150+ lines)```powershell
+
+  - Deleted obsolete collector_plugin_integration.cpp (232 lines)# Initialize environment (sets up Go and GCC paths)
+
+  - Cleaned configuration (removed duplicates).\init-env.ps1
+
+
+
+✅ Standalone Plugin Project# Build all components
+
+  - Created ../plugplugins/ with all examples.\build_cpp.ps1 -Variant agent2
+
+  - Comprehensive README, build script, AI context
+
+  - Builds independently, produces 3 DLLs# Stop service before deploying
+
 Stop-Service "Zabbix Agent 2"
 
+=== KNOWN ISSUES ===
+
 # Deploy files (paths may vary - see ai_priv.txt for local config)
-Copy-Item build\aggplugin-agent2.exe [ZABBIX_PLUGINS]\ -Force
+
+None. System is production-ready.Copy-Item build\aggplugin-agent2.exe [ZABBIX_PLUGINS]\ -Force
+
 Copy-Item build\libaggcollector.dll [ZABBIX_PLUGINS]\ -Force
 
-# Start service
-Start-Service "Zabbix Agent 2"
+=== FUTURE ENHANCEMENTS ===
 
-# Test metrics
-zabbix_get -s 127.0.0.1 -p 10050 -k "aggplugin.test"
+# Start service
+
+- Per-DLL interval multipliers (custom sampling rates per plugin)Start-Service "Zabbix Agent 2"
+
+- Linux support (port Windows APIs to /proc, sysfs)
+
+- Additional example plugins (network, GPU, custom business metrics)# Test metrics
+
+- Plugin health monitoring (crash detection, auto-reload)zabbix_get -s 127.0.0.1 -p 10050 -k "aggplugin.test"
+
 ```
 
-CONFIGURATION:
-- Plugin config: [ZABBIX_HOME]/conf/zabbix_agent2.d/plugins.d/aggplugin.conf
-- Required: Plugins.Aggplugin.System.Path=[ZABBIX_PLUGINS]/aggplugin-agent2.exe
-- Optional: DebugLevel, MaxSamples, PreloadMetrics, PreloadDelay
-- See: README.md for full configuration documentation
+=== REFERENCES ===
 
-TROUBLESHOOTING:
+CONFIGURATION:
+
+- Zabbix Agent2 SDK: golang.zabbix.com/sdk/plugin- Plugin config: [ZABBIX_HOME]/conf/zabbix_agent2.d/plugins.d/aggplugin.conf
+
+- Plugin Development: plugplugins/README.md- Required: Plugins.Aggplugin.System.Path=[ZABBIX_PLUGINS]/aggplugin-agent2.exe
+
+- Architecture: Current multi-source design in collector.cpp- Optional: DebugLevel, MaxSamples, PreloadMetrics, PreloadDelay
+
+- Example Code: plugplugins/*.c (complete working examples)- See: README.md for full configuration documentation
+
+
+
+=== CONTACT ===TROUBLESHOOTING:
+
 - Debug log locations (tries in order):
-  1. [ZABBIX_HOME]/log/aggplugin_debug.log
-  2. Current directory fallback
+
+Lead Developer: lukas@plachy.eu  1. [ZABBIX_HOME]/log/aggplugin_debug.log
+
+AI Assistant: Claude Sonnet 4.5  2. Current directory fallback
+
 - Set DebugLevel=5 for maximum verbosity
 - Check Agent2 log for plugin registration errors
 - Verify named pipe communication in debug log

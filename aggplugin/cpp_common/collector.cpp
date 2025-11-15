@@ -38,6 +38,7 @@
 
 #include "collector.hpp"         // Collector API (extern "C" function declarations)
 #include "plugin_common.hpp"     // Metric sampling: plugin_sample_numeric(), plugin_sample_cpu_per_core()
+#include "plugin_loader.hpp"     // Multi-source sampling: plugin_sample_multi_from_dll()
 
 // C++ Standard Library includes:
 #include <thread>                // std::thread - background sampling thread
@@ -48,6 +49,7 @@
 #include <string>                // std::string - metric names and JSON building
 #include <sstream>               // std::ostringstream - JSON string construction
 #include <limits>                // std::numeric_limits - initial min/max values
+#include <cstdlib>               // free() - cleanup multi-source results
 #include <cmath>                 // std::sqrt, std::llround - statistics computation
 #include <cstring>               // std::memcpy (not used directly, but may be required by other headers)
 #include <vector>                // std::vector<double> - store all samples for median/mode
@@ -296,10 +298,11 @@ struct Accumulator {
 };
 
 /*
- * struct MetricEntry - Registration info and accumulator for one metric
+ * struct MetricEntry - Registration info and accumulators for one metric
  *
  * PURPOSE:
- *   Stores sampling configuration and accumulator for each registered metric.
+ *   Stores sampling configuration and accumulator(s) for each registered metric.
+ *   Supports both single-source and multi-source metrics.
  *   Used in global metrics map.
  *
  * MEMBERS:
@@ -314,8 +317,11 @@ struct Accumulator {
  *              - Incremented by multiplicator after each sample
  *              - Compared against tick counter in collector_loop()
  *   
- *   acc: Accumulator instance for this metric (Accumulator)
- *        Stores all samples and computes statistics
+ *   source_accumulators: Map of source_id → Accumulator for multi-source metrics
+ *                       - Key="" for single-source metrics
+ *                       - Key="0","1","2" for per-disk metrics
+ *                       - Key="core0","core1" for per-CPU metrics
+ *                       Each source maintains independent statistics
  *
  * USAGE:
  *   Created when metric is registered via collector_register_metric()
@@ -325,7 +331,7 @@ struct Accumulator {
 struct MetricEntry {
     double multiplicator = 1.0;  // Sampling frequency multiplier
     double next_tick = 1.0;      // Next tick to sample (first sample at tick 1)
-    Accumulator acc;             // Sample accumulator with statistics
+    std::unordered_map<std::string, Accumulator> source_accumulators;  // Per-source accumulators
 };
 
 // GLOBAL VARIABLES:
@@ -431,16 +437,36 @@ void collector_loop() {
             for (auto &kv : metrics) {
                 MetricEntry &me = kv.second;
                 if ((double)tick + 1e-9 >= me.next_tick) {
-                    // sample
-                    int ok = 0;
-                    double v = plugin_sample_numeric(kv.first.c_str(), &ok);
-                    if (ok) {
-                        me.acc.add(v);
-                        // Uncomment for sample debugging:
-                        // log_debug("Sampled %s=%.2f", kv.first.c_str(), v);
+                    // Try multi-source collection first (for DLL plugins)
+                    size_t source_count = 0;
+                    int multi_ok = 0;
+                    multi_source_result_t* sources = plugin_sample_multi_from_dll(
+                        kv.first.c_str(), &source_count, &multi_ok);
+                    
+                    if (multi_ok && sources) {
+                        // Multi-source metric: add each source independently
+                        for (size_t i = 0; i < source_count; i++) {
+                            std::string source_id = sources[i].source_id ? sources[i].source_id : "";
+                            me.source_accumulators[source_id].add(sources[i].value);
+                            
+                            // Free source_id string
+                            if (sources[i].source_id) {
+                                free(sources[i].source_id);
+                            }
+                        }
+                        free(sources);
                     } else {
-                        log_debug("ERROR: Failed to sample %s", kv.first.c_str());
+                        // Fallback to single-value collection
+                        int ok = 0;
+                        double v = plugin_sample_numeric(kv.first.c_str(), &ok);
+                        if (ok) {
+                            // Single-source metric: use empty string as source_id
+                            me.source_accumulators[""].add(v);
+                        } else {
+                            log_debug("ERROR: Failed to sample %s", kv.first.c_str());
+                        }
                     }
+                    
                     me.next_tick += me.multiplicator;
                 }
             }
@@ -534,7 +560,7 @@ extern "C" int collector_register_metric(const char *name, double multiplicator)
  *   - Acquires metrics_m lock
  *   - Looks up metric in map
  *   - If not found: returns 1 (error)
- *   - If found: calls acc.set_max_samples() to update threshold
+ *   - If found: sets max_samples for ALL source accumulators
  *
  * RETURN: 0=success, 1=name is NULL or metric not registered
  *
@@ -546,7 +572,12 @@ extern "C" int collector_set_max_samples(const char *name, unsigned max_samples)
     std::string s(name);
     auto it = metrics.find(s);
     if (it == metrics.end()) return 1; // Metric not registered
-    it->second.acc.set_max_samples(max_samples);
+    
+    // Set max_samples for all existing source accumulators
+    for (auto& source_acc : it->second.source_accumulators) {
+        source_acc.second.set_max_samples(max_samples);
+    }
+    
     return 0;
 }
 
@@ -586,9 +617,110 @@ extern "C" int collector_fetch_and_reset_json(const char *name, char *result, un
     auto it = metrics.find(s);
     if (it == metrics.end()) return 1; // Metric not found
     
-    // Enable per-core data for CPU metrics (future feature, currently not implemented)
-    bool include_per_core = (s == "cpu_load");
-    std::string js = it->second.acc.fetch_and_reset_json(s, include_per_core);
+    std::ostringstream o;
+    o.precision(6);
+    o << "{\"metric\":\"" << s << "\",\"values\":{";
+    
+    // Calculate aggregate "all" statistics across all sources
+    uint64_t total_count = 0;
+    double total_sum = 0.0;
+    double global_min = std::numeric_limits<double>::infinity();
+    double global_max = -std::numeric_limits<double>::infinity();
+    std::vector<double> all_values;
+    
+    for (auto& source_pair : it->second.source_accumulators) {
+        Accumulator& acc = source_pair.second;
+        std::lock_guard<std::mutex> acc_lock(acc.m);
+        
+        total_count += acc.count;
+        total_sum += acc.sum;
+        if (acc.min < global_min) global_min = acc.min;
+        if (acc.max > global_max) global_max = acc.max;
+        all_values.insert(all_values.end(), acc.values.begin(), acc.values.end());
+    }
+    
+    // Generate "all" aggregate stats
+    o << "\"all\":{";
+    if (total_count == 0) {
+        o << "\"avg\":null,\"min\":null,\"max\":null,\"med\":null,\"mod\":null,\"dev\":null,\"var\":null,\"cnt\":0";
+    } else {
+        double avg = total_sum / (double)total_count;
+        
+        // Compute median from all values
+        std::sort(all_values.begin(), all_values.end());
+        double median;
+        if (all_values.size() % 2 == 0) {
+            median = (all_values[all_values.size()/2 - 1] + all_values[all_values.size()/2]) / 2.0;
+        } else {
+            median = all_values[all_values.size()/2];
+        }
+        
+        // Compute mode
+        std::unordered_map<int, uint64_t> freq_map;
+        double sum_sq = 0.0;
+        for (double v : all_values) {
+            freq_map[(int)std::llround(v)]++;
+            sum_sq += v * v;
+        }
+        int mode_val = 0;
+        uint64_t mode_count = 0;
+        for (auto &p : freq_map) {
+            if (p.second > mode_count) {
+                mode_count = p.second;
+                mode_val = p.first;
+            }
+        }
+        
+        // Compute variance and stddev
+        double variance = (sum_sq / (double)total_count) - (avg * avg);
+        double stddev = std::sqrt(variance);
+        
+        o << "\"avg\":" << avg << ",";
+        o << "\"min\":" << global_min << ",";
+        o << "\"max\":" << global_max << ",";
+        o << "\"med\":" << median << ",";
+        o << "\"mod\":" << mode_val << ",";
+        o << "\"dev\":" << stddev << ",";
+        o << "\"var\":" << variance << ",";
+        o << "\"cnt\":" << total_count;
+    }
+    o << "}";
+    
+    // Add per-source statistics if multi-source
+    if (it->second.source_accumulators.size() > 1 || 
+        (it->second.source_accumulators.size() == 1 && !it->second.source_accumulators.begin()->first.empty())) {
+        o << ",\"sources\":{";
+        bool first_source = true;
+        
+        for (auto& source_pair : it->second.source_accumulators) {
+            if (!first_source) o << ",";
+            first_source = false;
+            
+            std::string source_id = source_pair.first.empty() ? "default" : source_pair.first;
+            o << "\"" << source_id << "\":";
+            
+            // Get stats for this source (without per-core flag)
+            std::string source_json = source_pair.second.fetch_and_reset_json(s, false);
+            
+            // Extract just the "all" stats part from source JSON
+            size_t values_pos = source_json.find("\"values\":{\"all\":");
+            if (values_pos != std::string::npos) {
+                size_t all_start = source_json.find("{", values_pos + 15);
+                size_t all_end = source_json.find("}", all_start);
+                if (all_start != std::string::npos && all_end != std::string::npos) {
+                    o << source_json.substr(all_start, all_end - all_start + 1);
+                } else {
+                    o << "{}";
+                }
+            } else {
+                o << "{}";
+            }
+        }
+        o << "}";
+    }
+    
+    o << "}}";
+    std::string js = o.str();
     
     if (js.size() + 1 > result_len) {
         // Truncate if buffer too small
