@@ -44,14 +44,37 @@ window.widget_form = new class extends CWidgetForm {
 	setupColorSetHandler() {
 		// Color sets definition (must match PHP constants)
 		this._color_sets = {
-			0: '#1f77b4,#ff7f0e,#2ca02c,#d62728,#9467bd,#8c564b,#e377c2,#7f7f7f,#bcbd22,#17becf',
-			1: '#aec7e8,#ffbb78,#98df8a,#ff9896,#c5b0d5,#c49c94,#f7b6d2,#c7c7c7,#dbdb8d,#9edae5',
-			2: '#e60049,#0bb4ff,#50e991,#e6d800,#9b19f5,#ffa300,#dc0ab4,#b3d4ff,#00bfa0',
-			3: '#8b4513,#daa520,#228b22,#4682b4,#d2691e,#708238,#cd853f,#556b2f,#b8860b',
-			4: '#003f5c,#2f4b7c,#665191,#a05195,#d45087,#f95d6a,#ff7c43,#ffa600',
-			5: '#ff6b6b,#ff8e53,#ffbe0b,#fb5607,#ff006e,#8338ec,#3a86ff',
-			6: '#1b4332,#2d6a4f,#40916c,#52b788,#74c69d,#95d5b2,#b7e4c7,#d8f3dc',
-			7: '#000000,#2d2d2d,#5a5a5a,#878787,#b4b4b4,#e1e1e1,#ffffff'
+			0: '#000080, #9999ff, #3333b3, #b3b3ff, #1a1a99, #6666e6, #4d4dcc, #8080ff',
+			1: '#1a1a1a, #573a2d, #0d0d0d, #3d2e26, #5a2e2e, #2d2420, #4d2626, #4a3429',
+			2: '#87ceeb, #00ced1, #b0e0e6, #00cca3, #87d3db, #40e0d0, #7dd3c0, #00e5cc',
+			3: '#ff8c00, #ffa500, #d2a679, #cd853f, #f4d68e, #e6cc80, #f5deb3, #ffe4a3',
+			4: '#ffff00, #ffb300, #ffd700, #ffe680, #ffcc00, #ffe066, #ffdb4d, #ffcc66',
+			5: '#8b4513, #a0522d, #6b3410, #8b3a3a, #a0684a, #6d3030, #b88661, #5c2e2e',
+			6: '#008b8b, #40e0d0, #00ced1, #7fffd4, #20b2aa, #afeeee, #48d1cc, #5fd8d8',
+			7: '#800080, #6a1a3a, #8b008b, #800020, #9932cc, #6b2d5c, #8b0058, #9400d3',
+			8: '#9acd32, #8fbc3f, #7a9d2e, #aed850, #6b8e23, #c0e060, #5a7d1f, #b5d96b',
+			9: '#006400, #228b22, #004d00, #3cb371, #008000, #00662e, #2e8b57, #003d00',
+			10: '#39ff14, #7fff00, #28e028, #90ff90, #32cd32, #20b020, #00ff00, #57ff57',
+			11: '#013220, #005f56, #004d40, #006b54, #1f3f1f, #2c5c3c, #4a6b2f, #3d5c3d',
+			12: '#39ff14, #00ffff, #0dff92, #ccff00, #00ff9f, #adff2f, #00e5e5, #88ff00',
+			13: '#ff0000, #ff8800, #ffff00, #00ff00, #00ffff, #0088ff, #8800ff, #ff00ff',
+			14: '#ff00ff, #8800ff, #0088ff, #00ffff, #00ff00, #ffff00, #ff8800, #ff0000',
+			15: '#8b0000, #a02020, #cd0000, #ff0000, #ff3333, #ff6666, #ff9999, #ffcccc',
+			16: '#5c0000, #6b0000, #7a0000, #8b0000, #9a1515, #a02020, #b03030, #c04040',
+			17: '#ff6666, #ff7777, #ff8888, #ff9999, #ffaaaa, #ffbbbb, #ffcccc, #ffdddd',
+			18: '#ff1493, #ff3399, #ff66b3, #ff69b4, #ff99cc, #ffb3d9, #ffcce6, #ffe6f2',
+			19: '#003300, #004400, #005500, #006400, #007300, #008200, #009100, #00a000',
+			20: '#008000, #009900, #00b300, #00cc00, #00e600, #00ff00, #66ff66, #99ff99',
+			21: '#66ff66, #77ff77, #88ff88, #99ff99, #aaffaa, #bbffbb, #ccffcc, #ddffdd',
+			22: '#000066, #000080, #00009a, #0000b3, #0000cd, #1a1aff, #3333ff, #4d4dff',
+			23: '#0000ff, #1a1aff, #3333ff, #4d4dff, #6666ff, #8080ff, #9999ff, #b3b3ff',
+			24: '#6666ff, #7777ff, #87ceeb, #99ccff, #aaddff, #bbddff, #cceeff, #e6f5ff',
+			25: '#cccc00, #e6e600, #ffff00, #ffff33, #ffff66, #ffff99, #ffffcc, #ffffe6',
+			26: '#cc6600, #ff7700, #ff8800, #ff9933, #ffaa66, #ffbb99, #ffccaa, #ffddcc',
+			27: '#6600cc, #7700ee, #8800ff, #9933ff, #aa66ff, #bb99ff, #ccbbff, #ddccff',
+			28: '#660066, #800080, #990099, #b300b3, #cc66cc, #d999d9, #e6cce6, #f2e6f2',
+			29: '#4d2600, #663300, #804000, #994d00, #b36600, #cc8033, #d99966, #e6b399',
+			30: '#000000, #1a1a1a, #333333, #4d4d4d, #666666, #808080, #999999, #b3b3b3'
 		};
 
 		// Try to find and setup fields immediately and after delay
