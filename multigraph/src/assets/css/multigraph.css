@@ -38,6 +38,8 @@
 .multigraph-widget {
     padding: 10px;     /* Breathing room within widget cell */
     height: 100%;      /* Fill widget cell height */
+    box-sizing: border-box; /* Include padding in height calculation */
+    overflow: hidden;  /* Prevent scrollbars */
 }
 
 /* === HEADER SECTION === */
@@ -87,6 +89,8 @@
     position: relative; /* Establishes positioning context for absolute canvases */
     width: 100%;        /* Fill widget width */
     height: 100%;       /* Fill widget height */
+    overflow: hidden;   /* Prevent scrollbars from canvas overflow */
+    box-sizing: border-box; /* Include any border/padding in dimensions */
 }
 
 /* Base styling for both canvas layers */

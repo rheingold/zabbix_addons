@@ -45,9 +45,13 @@ if (-not $gccFound) {
     exit 1
 }
 
-# Ensure build directory exists
+# Ensure build directories exist
 $buildDir = Join-Path $PSScriptRoot "build"
+$buildWinDir = Join-Path $buildDir "win"
+$buildLinDir = Join-Path $buildDir "lin"
 if (-not (Test-Path $buildDir)) { New-Item -ItemType Directory -Path $buildDir | Out-Null }
+if (-not (Test-Path $buildWinDir)) { New-Item -ItemType Directory -Path $buildWinDir | Out-Null }
+if (-not (Test-Path $buildLinDir)) { New-Item -ItemType Directory -Path $buildLinDir | Out-Null }
 
 Push-Location -Path (Join-Path $PSScriptRoot "cpp_agent_wrapper")
 try {
@@ -70,23 +74,23 @@ try {
     
     if ($Variant -eq 'classic' -or $Variant -eq 'both') {
         Write-Host "Building classic agent DLL..."
-        g++ -shared -o "../build/aggplugin_classic.dll" unified_wrapper.cpp "$commonPath/plugin_common.cpp" "$commonPath/plugin_loader.cpp" "$commonPath/collector.cpp" $zabbixInclude -I"$commonPath" -DZABBIX_CLASSIC_AGENT -static-libgcc -static-libstdc++ -lpdh
+        g++ -shared -o "../build/win/aggplugin_classic.dll" unified_wrapper.cpp "$commonPath/plugin_common.cpp" "$commonPath/plugin_loader.cpp" "$commonPath/collector.cpp" $zabbixInclude -I"$commonPath" -DZABBIX_CLASSIC_AGENT -static-libgcc -static-libstdc++ -lpdh
         if ($LASTEXITCODE -ne 0) { throw "classic build failed" }
-        Write-Host "Created build/aggplugin_classic.dll"
+        Write-Host "Created build/win/aggplugin_classic.dll"
     }
 
     if ($Variant -eq 'agent2' -or $Variant -eq 'both') {
         Write-Host "Building agent2 plugin DLL (requires agent2 headers/libs)..."
-        g++ -shared -o "../build/aggplugin_agent2.dll" unified_wrapper.cpp "$commonPath/plugin_common.cpp" "$commonPath/collector.cpp" "$commonPath/plugin_loader.cpp" $zabbixInclude -I"$commonPath" -DZABBIX_AGENT2 -static-libgcc -static-libstdc++ -lpdh
+        g++ -shared -o "../build/win/aggplugin_agent2.dll" unified_wrapper.cpp "$commonPath/plugin_common.cpp" "$commonPath/collector.cpp" "$commonPath/plugin_loader.cpp" $zabbixInclude -I"$commonPath" -DZABBIX_AGENT2 -static-libgcc -static-libstdc++ -lpdh
         if ($LASTEXITCODE -ne 0) { Write-Warning "agent2 build failed (likely missing SDK headers/libs)." }
-        else { Write-Host "Created build/aggplugin_agent2.dll" }
+        else { Write-Host "Created build/win/aggplugin_agent2.dll" }
     }
 
     # Build collector shared library for CGO
     Write-Host "Building collector shared library for Go CGO..."
-    g++ -shared -o "../build/libaggcollector.dll" "$commonPath/collector_shared.cpp" "$commonPath/collector.cpp" "$commonPath/plugin_common.cpp" "$commonPath/plugin_loader.cpp" -I"$commonPath" -static-libgcc -static-libstdc++ -lpdh
+    g++ -shared -o "../build/win/libaggcollector.dll" "$commonPath/collector_shared.cpp" "$commonPath/collector.cpp" "$commonPath/plugin_common.cpp" "$commonPath/plugin_loader.cpp" -I"$commonPath" -static-libgcc -static-libstdc++ -lpdh
     if ($LASTEXITCODE -ne 0) { Write-Warning "collector shared library build failed." }
-    else { Write-Host "Created build/libaggcollector.dll" }
+    else { Write-Host "Created build/win/libaggcollector.dll" }
 }
 finally { Pop-Location }
 
@@ -95,9 +99,9 @@ if ($Variant -eq 'agent2' -or $Variant -eq 'both') {
     Write-Host "`nBuilding Go Agent2 wrapper executable..."
     Push-Location -Path (Join-Path $PSScriptRoot "go_agent2_wrapper")
     try {
-        go build -o "..\build\aggplugin-agent2.exe"
+        go build -o "..\build\win\aggplugin-agent2.exe"
         if ($LASTEXITCODE -ne 0) { Write-Warning "Go Agent2 wrapper build failed." }
-        else { Write-Host "Created build/aggplugin-agent2.exe" }
+        else { Write-Host "Created build/win/aggplugin-agent2.exe" }
     }
     finally { Pop-Location }
 }
@@ -108,15 +112,15 @@ if ($Deploy -and (Test-Path "C:\Zabbix")) {
     Write-Host "`nDeploying to Zabbix standard directories..."
     
     # Classic Agent DLL deployment
-    if (Test-Path "$buildDir\aggplugin_classic.dll") {
-        Copy-Item "$buildDir\aggplugin_classic.dll" "C:\Zabbix\modules\" -Force
+    if (Test-Path "$buildWinDir\aggplugin_classic.dll") {
+        Copy-Item "$buildWinDir\aggplugin_classic.dll" "C:\Zabbix\modules\" -Force
         Write-Host "Deployed: C:\Zabbix\modules\aggplugin_classic.dll"
     }
     
     # Agent2 Plugin deployment  
-    if (Test-Path "$buildDir\aggplugin-agent2.exe") {
-        Copy-Item "$buildDir\aggplugin-agent2.exe" "C:\Zabbix\plugins\" -Force
-        Copy-Item "$buildDir\libaggcollector.dll" "C:\Zabbix\plugins\" -Force
+    if (Test-Path "$buildWinDir\aggplugin-agent2.exe") {
+        Copy-Item "$buildWinDir\aggplugin-agent2.exe" "C:\Zabbix\plugins\" -Force
+        Copy-Item "$buildWinDir\libaggcollector.dll" "C:\Zabbix\plugins\" -Force
         Write-Host "Deployed: C:\Zabbix\plugins\aggplugin-agent2.exe"
         Write-Host "Deployed: C:\Zabbix\plugins\libaggcollector.dll"
     }

@@ -96,7 +96,7 @@ package main
 
 /*
 #cgo CFLAGS: -IC:/msys64/mingw64/include -I../cpp_common
-#cgo LDFLAGS: -L../build -laggcollector
+#cgo LDFLAGS: -L../build/win -laggcollector
 #include <stdlib.h>
 #include <windows.h>
 

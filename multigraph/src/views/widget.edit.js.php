@@ -80,7 +80,7 @@ window.widget_form = new class extends CWidgetForm {
 			
 			this._color_set.addEventListener('change', () => {
 				const selectedSet = parseInt(this._color_set.value);
-				if (this._color_sets[selectedSet]) {
+				if (!isNaN(selectedSet) && selectedSet >= 0 && this._color_sets[selectedSet]) {
 					this._graph_colors.value = this._color_sets[selectedSet];
 					this._graph_colors.dispatchEvent(new Event('input', { bubbles: true }));
 					this._graph_colors.dispatchEvent(new Event('change', { bubbles: true }));

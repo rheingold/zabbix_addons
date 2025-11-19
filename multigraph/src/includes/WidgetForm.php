@@ -301,9 +301,9 @@ class WidgetForm extends CWidgetForm {
 			)
 			->addField(
 				(new CWidgetFieldSelect('color_set', _('Color set'), 
-					array_map(function($v) { return explode(':', $v)[0]; }, self::COLOR_SETS)
+					[-1 => _('— Select color set —')] + array_map(function($v) { return explode(':', $v)[0]; }, self::COLOR_SETS)
 				))
-					->setDefault(self::COLOR_SET_DEFAULT)
+					->setDefault(-1)
 			)
 			->addField(
 				(new CWidgetFieldRadioButtonList('color_mode', _('Color mode'), [
