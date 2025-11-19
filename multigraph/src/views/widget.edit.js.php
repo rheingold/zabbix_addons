@@ -77,6 +77,41 @@ window.widget_form = new class extends CWidgetForm {
 			30: '#000000, #1a1a1a, #333333, #4d4d4d, #666666, #808080, #999999, #b3b3b3'
 		};
 
+		// Color set names (must match order of _color_sets keys)
+		this._color_set_names = [
+			'CPU',
+			'CPU 2',
+			'RAM',
+			'Storage / DB',
+			'Storage / DB 2',
+			'Network',
+			'Network 2',
+			'Services',
+			'Services 2',
+			'Services 3',
+			'Services 4',
+			'Disk Operations',
+			'Temperature',
+			'Rainbow',
+			'Rainbow Inverse',
+			'Red Gradient',
+			'Dark Red Gradient',
+			'Light Red Gradient',
+			'Pink Gradient',
+			'Dark Green Gradient',
+			'Green Gradient',
+			'Light Green Gradient',
+			'Dark Blue Gradient',
+			'Blue Gradient',
+			'Light Blue Gradient',
+			'Yellow Gradient',
+			'Orange Gradient',
+			'Violet Gradient',
+			'Purple Gradient',
+			'Brown Gradient',
+			'Grayscale'
+		];
+
 		// Try to find and setup fields immediately and after delay
 		this.trySetupFields();
 		setTimeout(() => this.trySetupFields(), 100);
@@ -101,6 +136,27 @@ window.widget_form = new class extends CWidgetForm {
 			this._color_set = color_set;
 			this._graph_colors = graph_colors;
 			
+			// Create color preview container
+			this._color_preview = document.createElement('div');
+			this._color_preview.style.cssText = 'margin-top: 4px; display: flex; flex-wrap: wrap; gap: 2px; min-height: 14px;';
+			
+			// Insert preview container after the graph_colors input
+			const parentContainer = this._graph_colors.closest('.form-field') || this._graph_colors.parentElement;
+			if (parentContainer) {
+				parentContainer.appendChild(this._color_preview);
+			}
+			
+			// Update preview when colors change
+			const updatePreview = () => {
+				this.updateColorPreview();
+			};
+			
+			this._graph_colors.addEventListener('input', updatePreview);
+			this._graph_colors.addEventListener('change', updatePreview);
+			
+			// Initial preview render
+			updatePreview();
+			
 			this._color_set.addEventListener('change', () => {
 				const selectedSet = parseInt(this._color_set.value);
 				if (!isNaN(selectedSet) && selectedSet >= 0 && this._color_sets[selectedSet]) {
@@ -112,6 +168,40 @@ window.widget_form = new class extends CWidgetForm {
 			
 			this._handler_installed = true;
 		}
+	}
+
+	/**
+	 * Update color preview boxes below graph_colors field
+	 */
+	updateColorPreview() {
+		if (!this._color_preview || !this._graph_colors) {
+			return;
+		}
+
+		// Clear existing preview
+		this._color_preview.innerHTML = '';
+
+		const colorsText = this._graph_colors.value || '';
+		
+		// Extract valid hex colors using regex
+		// Matches #RRGGBB format (case-insensitive)
+		const hexRegex = /#[0-9A-Fa-f]{6}\b/g;
+		const validColors = colorsText.match(hexRegex) || [];
+
+		// Create a small colored box for each valid color
+		validColors.forEach(color => {
+			const box = document.createElement('div');
+			box.style.cssText = `
+				width: 12px;
+				height: 12px;
+				background-color: ${color};
+				border: 1px solid #ccc;
+				border-radius: 2px;
+				display: inline-block;
+			`;
+			box.title = color; // Tooltip showing the hex value
+			this._color_preview.appendChild(box);
+		});
 	}
 
 	/**
