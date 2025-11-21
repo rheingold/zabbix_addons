@@ -90,7 +90,16 @@ try {
     Write-Host "Building collector shared library for Go CGO..."
     g++ -shared -o "../build/win/libaggcollector.dll" "$commonPath/collector_shared.cpp" "$commonPath/collector.cpp" "$commonPath/plugin_common.cpp" "$commonPath/plugin_loader.cpp" -I"$commonPath" -static-libgcc -static-libstdc++ -lpdh
     if ($LASTEXITCODE -ne 0) { Write-Warning "collector shared library build failed." }
-    else { Write-Host "Created build/win/libaggcollector.dll" }
+    else { 
+        Write-Host "Created build/win/libaggcollector.dll" 
+        
+        # Copy MinGW pthread DLL dependency
+        $pthreadDll = "C:\msys64\mingw64\bin\libwinpthread-1.dll"
+        if (Test-Path $pthreadDll) {
+            Copy-Item $pthreadDll "../build/win/" -Force
+            Write-Host "Copied build/win/libwinpthread-1.dll (required runtime dependency)"
+        }
+    }
 }
 finally { Pop-Location }
 
@@ -106,6 +115,33 @@ if ($Variant -eq 'agent2' -or $Variant -eq 'both') {
     finally { Pop-Location }
 }
 
+# Build example measurement plugin DLLs (if example_plugins directory exists)
+if (Test-Path "example_plugins") {
+    Write-Host "`nBuilding example measurement plugins..."
+    $examplePlugins = @("cpu_load_plugin", "memory_usage_plugin", "disk_stats_plugin")
+    
+    foreach ($plugin in $examplePlugins) {
+        $sourceFile = "example_plugins\$plugin.c"
+        $outputFile = "$buildWinDir\$plugin.dll"
+        
+        if (Test-Path $sourceFile) {
+            Write-Host "Building $plugin.dll..."
+            g++ -shared -o $outputFile $sourceFile `
+                -I"cpp_common" `
+                -I"..\zabbixlib\include" `
+                -lpdh `
+                -static-libgcc `
+                -static-libstdc++
+            
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "Created $outputFile" -ForegroundColor Green
+            } else {
+                Write-Host "Failed to build $plugin.dll" -ForegroundColor Red
+            }
+        }
+    }
+}
+
 # Deployment section
 
 if ($Deploy -and (Test-Path "C:\Zabbix")) {
@@ -119,9 +155,32 @@ if ($Deploy -and (Test-Path "C:\Zabbix")) {
     
     # Agent2 Plugin deployment  
     if (Test-Path "$buildWinDir\aggplugin-agent2.exe") {
-        Copy-Item "$buildWinDir\aggplugin-agent2.exe" "C:\Zabbix\plugins\" -Force
-        Copy-Item "$buildWinDir\libaggcollector.dll" "C:\Zabbix\plugins\" -Force
-        Write-Host "Deployed: C:\Zabbix\plugins\aggplugin-agent2.exe"
-        Write-Host "Deployed: C:\Zabbix\plugins\libaggcollector.dll"
+        Copy-Item "$buildWinDir\aggplugin-agent2.exe" "C:\Zabbix\bin\" -Force
+        Copy-Item "$buildWinDir\libaggcollector.dll" "C:\Zabbix\bin\" -Force
+        Copy-Item "$buildWinDir\libwinpthread-1.dll" "C:\Zabbix\bin\" -Force -ErrorAction SilentlyContinue
+        
+        Write-Host "Deployed: C:\Zabbix\bin\aggplugin-agent2.exe"
+        Write-Host "Deployed: C:\Zabbix\bin\libaggcollector.dll"
+        Write-Host "Deployed: C:\Zabbix\bin\libwinpthread-1.dll"
+        
+        # Deploy measurement plugin DLLs
+        $pluginDlls = Get-ChildItem "$buildWinDir\*_plugin.dll" -ErrorAction SilentlyContinue
+        if ($pluginDlls) {
+            New-Item -ItemType Directory -Path "C:\Zabbix\bin\plugins" -Force | Out-Null
+            foreach ($dll in $pluginDlls) {
+                Copy-Item $dll.FullName "C:\Zabbix\bin\plugins\" -Force
+                Write-Host "Deployed: C:\Zabbix\bin\plugins\$($dll.Name)"
+            }
+        }
+        
+        # Deploy config if it doesn't exist
+        $configDest = "C:\Zabbix\conf\zabbix_agent2.d\plugins.d\aggplugin.conf"
+        if (-not (Test-Path $configDest)) {
+            New-Item -ItemType Directory -Path "C:\Zabbix\conf\zabbix_agent2.d\plugins.d" -Force | Out-Null
+            Copy-Item "$buildWinDir\aggplugin.conf" $configDest -Force
+            Write-Host "Deployed: $configDest"
+        } else {
+            Write-Host "Config exists: $configDest (not overwritten)"
+        }
     }
 }

@@ -32,3 +32,14 @@ desktop.ini
 # Temporary files
 *.tmp
 *.temp
+# Build artifacts (binaries should not be in source control)
+aggplugin/build/win/*.exe
+aggplugin/build/win/*.dll
+aggplugin/build/win/*.conf
+
+# Installer packages (should be built separately)
+instpackage_my1/
+
+# Temporary test files
+aggplugin/temp_*.go
+aggplugin/test_*.ps1
