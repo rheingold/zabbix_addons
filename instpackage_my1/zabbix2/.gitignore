@@ -1,0 +1,60 @@
+# Zabbix Agent Deployment Package - Git Ignore
+
+# Private AI files (SSH keys, credentials)
+ai_priv/
+
+# Binaries - Do not commit Zabbix executables and Privoxy
+# But keep placeholder files (.__place) to indicate where binaries should be placed
+win/bin/*.exe
+win/bin/*.dll
+win/bin/plugins/*.dll
+lin/bin/*
+!win/bin/*.__place
+!win/bin/plugins/*.__place
+!lin/bin/*.__place
+*.so
+*.dylib
+
+# Configuration files with sensitive data
+.baseval.ini
+**/install/.baseval.ini
+
+# Installation state tracking files
+.installsrcdir
+.useagent
+
+# Log files
+log/
+win/log/
+lin/log/
+*.log
+*.log.txt
+
+# Backup and temporary files
+*.bak
+*.tmp
+*.old
+*~
+
+# Archives
+*.zip
+*.cab
+*.tar.gz
+*.tar.bz2
+*.7z
+
+# Windows specific
+Thumbs.db
+Desktop.ini
+
+# MacOS specific
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor and IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
