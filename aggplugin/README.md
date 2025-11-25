@@ -62,7 +62,32 @@ The Aggplugin continuously monitors your system metrics in the background and pr
 
 **NEW:** Built-in CPU and memory metrics are now also available as **example plugins** (`cpu_load_plugin.dll`, `memory_usage_plugin.dll`), demonstrating the plugin framework!
 
-### Installation Steps
+### Installation
+
+#### Automatic Installation (Recommended)
+
+🎉 **NEW: Automatic Installer Integration!**
+
+If you're using the `instpackage_my1` Zabbix Agent installer, aggplugin is now automatically configured during installation with correct absolute paths. No manual configuration needed!
+
+The installer will:
+- Deploy all aggplugin binaries and measurement plugins
+- Configure absolute paths automatically
+- Set up plugin configuration with recommended defaults
+- Start the service with aggplugin enabled
+
+**See:** [INSTALLER_INTEGRATION.md](INSTALLER_INTEGRATION.md) for deployment details and [INSTALLER_CHANGES.md](INSTALLER_CHANGES.md) for technical implementation.
+
+After installation, verify metrics are working:
+```powershell
+C:\zabbix\bin\zabbix_get.exe -s 127.0.0.1 -p 10050 -k "aggplugin._internal.test"
+```
+
+---
+
+#### Manual Installation Steps
+
+If you're not using the automatic installer, follow these steps:
 
 #### 1. Download Pre-built Files
 
