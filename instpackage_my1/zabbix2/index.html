@@ -1,0 +1,1237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zabbix Agent Deployment Generator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #a8a8a8 0%, #d0d0d0 40%, #f0f0f0 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+            max-width: 800px;
+            width: 100%;
+            padding: 40px;
+            position: relative;
+        }
+        
+        .language-switcher {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            display: flex;
+            gap: 5px;
+            font-size: 11px;
+        }
+        
+        .language-switcher button {
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            padding: 4px 8px;
+            border-radius: 3px;
+            cursor: pointer;
+            color: #666;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+        
+        .language-switcher button:hover {
+            background: #e0e0e0;
+        }
+        
+        .language-switcher button.active {
+            background: #d32f2f;
+            color: white;
+            border-color: #d32f2f;
+        }
+        
+        .header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 10px;
+        }
+        
+        .logo {
+            width: 50px;
+            height: 50px;
+        }
+        
+        h1 {
+            color: #333;
+            margin: 0;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        input[type="text"],
+        input[type="url"],
+        select,
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        input:focus,
+        select:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #d32f2f;
+        }
+        
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #d32f2f 0%, #b71c1c 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 10px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(211, 47, 47, 0.4);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .info-box {
+            background: #f8f9fa;
+            border-left: 4px solid #d32f2f;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+        
+        .info-box p {
+            color: #555;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+            margin-right: 10px;
+        }
+        
+        .success-message {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+            display: none;
+        }
+        
+        .file-upload {
+            border: 2px dashed #e0e0e0;
+            border-radius: 5px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+        
+        .file-upload:hover {
+            border-color: #d32f2f;
+        }
+        
+        .file-upload input {
+            display: none;
+        }
+        
+        .platform-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        .platform-btn {
+            flex: 1;
+            padding: 12px 20px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            color: #666;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .platform-btn:hover {
+            border-color: #d32f2f;
+            color: #d32f2f;
+        }
+        
+        .platform-btn.active {
+            background: linear-gradient(135deg, #d32f2f 0%, #b71c1c 100%);
+            color: white;
+            border-color: transparent;
+        }
+        
+        .platform-btn .icon {
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="language-switcher">
+            <button onclick="switchLanguage('cze')" class="active" id="langCze">CZ</button>
+            <button onclick="switchLanguage('eng')" id="langEng">EN</button>
+            <button onclick="switchLanguage('ger')" id="langGer">DE</button>
+        </div>
+        
+        <div class="header">
+            <svg class="logo" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                <rect x="10" y="10" width="80" height="80" fill="#d32f2f" rx="5"/>
+                <text x="50" y="65" font-family="Arial, sans-serif" font-size="45" font-weight="bold" fill="white" text-anchor="middle">Z</text>
+            </svg>
+            <div>
+                <h1 data-i18n="title">Generátor instalace Zabbix Agenta</h1>
+                <p class="subtitle" data-i18n="subtitle">Vytvoření samostatného instalátoru s vestavěnými binárkami</p>
+            </div>
+        </div>
+        
+        <div class="platform-selector">
+            <button type="button" class="platform-btn active" data-platform="windows" id="windowsBtn">
+                <span class="icon">🪟</span>
+                <span>Windows</span>
+            </button>
+            <button type="button" class="platform-btn" data-platform="linux" id="linuxBtn">
+                <span class="icon">🐧</span>
+                <span>Linux/macOS</span>
+            </button>
+        </div>
+        
+        <div class="info-box">
+            <p><strong data-i18n="howItWorksTitle">Jak to funguje:</strong> <span data-i18n="howItWorksText">Tento nástroj vytvoří jediný instalační soubor, který obsahuje všechny soubory Zabbix agenta zakódované uvnitř. Po spuštění instalátor automaticky rozbalí a nakonfiguruje agenta.</span></p>
+            <p style="margin-top: 10px;"><strong data-i18n="noteTitle">Poznámka:</strong> <span data-i18n="noteText">Předpřipravené soubory (zabbix-win.cab/zip, zabbix-lin.zip) jsou automaticky detekovány, pokud jsou dostupné ve stejné složce. CAB formát je preferován pro Windows XP SP2+ kompatibilitu.</span></p>
+            <p id="versionInfo" style="margin-top: 10px; font-size: 0.9em; color: #666;"></p>
+        </div>
+        
+        <form id="deploymentForm">
+            <div class="form-group">
+                <label for="packageSource" data-i18n="packageSource">Zdroj balíčku:</label>
+                <select id="packageSource">
+                    <option value="auto" data-i18n="packageSourceAuto">Automatická detekce (použít dostupné ZIP soubory)</option>
+                    <option value="upload" data-i18n="packageSourceUpload">Nahrát vlastní ZIP soubor</option>
+                </select>
+            </div>
+            
+            <div class="form-group" id="uploadGroup" style="display: none;">
+                <label data-i18n="uploadLabel">Nahrát Zabbix binárky (ZIP):</label>
+                <div class="file-upload" onclick="document.getElementById('binariesFile').click()">
+                    <input type="file" id="binariesFile" accept=".zip,.cab">
+                    <p id="fileUploadText" data-i18n="uploadText">📁 Klikněte pro výběr ZIP souboru s binárkami Zabbix</p>
+                </div>
+            </div>
+            
+            <div class="form-group" id="statusGroup">
+                <p id="packageStatus" style="color: #d32f2f; font-weight: 600;" data-i18n="checkingPackages">🔍 Kontrola dostupných balíčků...</p>
+            </div>
+            
+            <div class="form-group">
+                <label for="serverAddress" data-i18n="serverAddress">Adresa Zabbix serveru:</label>
+                <input type="text" id="serverAddress" value="zabbix.plachy.eu" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="customerPrefix" data-i18n="customerPrefix">Prefix zákaznického ID:</label>
+                <input type="text" id="customerPrefix" value="Customer-" required>
+            </div>
+
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="autoAppendHostname" checked>
+                    <span data-i18n="autoAppendHostname">Automaticky přidat název počítače</span>
+                </label>
+            </div>
+            
+            <div class="form-group">
+                <label for="agentVersion" data-i18n="agentVersion">Verze agenta:</label>
+                <select id="agentVersion">
+                    <option value="1">Zabbix Agent v1</option>
+                    <option value="2" selected>Zabbix Agent v2</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="installPath" data-i18n="installPath">Výchozí instalační cesta:</label>
+                <input type="text" id="installPath" value="C:\zabbix" required>
+            </div>
+            
+            <div class="checkbox-group">
+                <input type="checkbox" id="includeLogs" checked>
+                <label for="includeLogs" data-i18n="includeLogs">Automaticky vytvořit adresáře pro logy</label>
+            </div>
+            
+            <div class="checkbox-group">
+                <input type="checkbox" id="autoStart" checked>
+                <label for="autoStart" data-i18n="autoStart">Automaticky spustit službu po instalaci</label>
+            </div>
+            
+            <div class="checkbox-group">
+                <input type="checkbox" id="runInteractive">
+                <label for="runInteractive" data-i18n="runInteractive">Spustit interaktivní instalaci</label>
+            </div>
+            
+            <button type="submit" class="btn" data-i18n="generateButton">🔧 Generovat instalátor</button>
+        </form>
+        
+        <div class="success-message" id="successMessage">
+            <span data-i18n="successMessage">✅ Instalátor byl úspěšně vygenerován! Stahování by mělo začít automaticky.</span>
+        </div>
+    </div>
+    
+    <script>
+        // Multi-language support
+        const translations = {
+            cze: {
+                title: 'Generátor instalace Zabbix Agenta',
+                subtitle: 'Vytvoření samostatného instalátoru s vestavěnými binárkami',
+                howItWorksTitle: 'Jak to funguje:',
+                howItWorksText: 'Tento nástroj vytvoří jediný instalační soubor, který obsahuje všechny soubory Zabbix agenta zakódované uvnitř. Po spuštění instalátor automaticky rozbalí a nakonfiguruje agenta.',
+                noteTitle: 'Poznámka:',
+                noteText: 'Předpřipravené soubory (zabbix-win.cab/zip, zabbix-lin.zip) jsou automaticky detekovány, pokud jsou dostupné ve stejné složce. CAB formát je preferován pro Windows XP SP2+ kompatibilitu.',
+                packageSource: 'Zdroj balíčku:',
+                packageSourceAuto: 'Automatická detekce (použít dostupné ZIP soubory)',
+                packageSourceUpload: 'Nahrát vlastní ZIP soubor',
+                uploadLabel: 'Nahrát Zabbix binárky (ZIP):',
+                uploadText: '📁 Klikněte pro výběr ZIP souboru s binárkami Zabbix',
+                checkingPackages: '🔍 Kontrola dostupných balíčků...',
+                serverAddress: 'Adresa Zabbix serveru:',
+                customerPrefix: 'Prefix zákaznického ID:',
+                autoAppendHostname: 'Automaticky přidat název počítače',
+                runInteractive: 'Spustit interaktivní instalaci',
+                agentVersion: 'Verze agenta:',
+                installPath: 'Výchozí instalační cesta:',
+                includeLogs: 'Automaticky vytvořit adresáře pro logy',
+                autoStart: 'Automaticky spustit službu po instalaci',
+                generateButton: '🔧 Generovat instalátor',
+                successMessage: '✅ Instalátor byl úspěšně vygenerován! Stahování by mělo začít automaticky.',
+                packageFound: 'nalezen a připraven k použití',
+                packageNotFound: 'nenalezen. Prosím nahrajte vlastní ZIP soubor.',
+                alertPackageNotFound: 'Balíček nenalezen. Prosím vyberte možnost "Nahrát vlastní ZIP soubor".',
+                alertLoadFailed: 'Nepodařilo se načíst soubor balíčku:',
+                alertUploadRequired: 'Prosím nahrajte ZIP soubor obsahující binárky Zabbix!'
+            },
+            eng: {
+                title: 'Zabbix Agent Deployment Generator',
+                subtitle: 'Generate a self-contained installer with embedded binaries',
+                howItWorksTitle: 'How it works:',
+                howItWorksText: 'This tool creates a single installer file that contains all Zabbix agent files encoded within it. When executed, the installer extracts and configures the agent automatically.',
+                noteTitle: 'Note:',
+                noteText: 'Pre-packaged files (zabbix-win.cab/zip, zabbix-lin.zip) are automatically detected if available in the same directory. CAB format is preferred for Windows XP SP2+ compatibility.',
+                packageSource: 'Package Source:',
+                packageSourceAuto: 'Auto-detect (use available ZIP files)',
+                packageSourceUpload: 'Upload custom ZIP file',
+                uploadLabel: 'Upload Zabbix Binaries (ZIP):',
+                uploadText: '📁 Click to select ZIP file containing Zabbix binaries',
+                checkingPackages: '🔍 Checking for available packages...',
+                serverAddress: 'Zabbix Server Address:',
+                customerPrefix: 'Customer ID Prefix:',
+                autoAppendHostname: 'Automatically append computer name',
+                runInteractive: 'Run Interactive Install',
+                agentVersion: 'Agent Version:',
+                installPath: 'Default Installation Path:',
+                includeLogs: 'Create log directories automatically',
+                autoStart: 'Start service automatically after installation',
+                generateButton: '🔧 Generate Installer',
+                successMessage: '✅ Installer generated successfully! The download should start automatically.',
+                packageFound: 'found and ready to use',
+                packageNotFound: 'not found. Please upload a custom ZIP file.',
+                alertPackageNotFound: 'Package not found. Please select "Upload custom ZIP file" option.',
+                alertLoadFailed: 'Failed to load package file:',
+                alertUploadRequired: 'Please upload a ZIP file containing Zabbix binaries!'
+            },
+            ger: {
+                title: 'Zabbix Agent Installations-Generator',
+                subtitle: 'Erstellen Sie ein eigenständiges Installationsprogramm mit eingebetteten Binärdateien',
+                howItWorksTitle: 'So funktioniert es:',
+                howItWorksText: 'Dieses Tool erstellt eine einzelne Installationsdatei, die alle Zabbix-Agent-Dateien kodiert enthält. Bei der Ausführung extrahiert und konfiguriert das Installationsprogramm den Agenten automatisch.',
+                noteTitle: 'Hinweis:',
+                noteText: 'Vorverpackte Dateien (zabbix-win.cab/zip, zabbix-lin.zip) werden automatisch erkannt, falls sie im selben Verzeichnis verfügbar sind. CAB-Format wird für Windows XP SP2+ Kompatibilität bevorzugt.',
+                packageSource: 'Paketquelle:',
+                packageSourceAuto: 'Automatische Erkennung (verfügbare ZIP-Dateien verwenden)',
+                packageSourceUpload: 'Benutzerdefinierte ZIP-Datei hochladen',
+                uploadLabel: 'Zabbix-Binärdateien hochladen (ZIP):',
+                uploadText: '📁 Klicken Sie, um eine ZIP-Datei mit Zabbix-Binärdateien auszuwählen',
+                checkingPackages: '🔍 Überprüfung verfügbarer Pakete...',
+                serverAddress: 'Zabbix-Serveradresse:',
+                customerPrefix: 'Kunden-ID-Präfix:',
+                autoAppendHostname: 'Automatisch Computernamen anhängen',
+                runInteractive: 'Interaktive Installation ausführen',
+                agentVersion: 'Agent-Version:',
+                installPath: 'Standard-Installationspfad:',
+                includeLogs: 'Log-Verzeichnisse automatisch erstellen',
+                autoStart: 'Dienst nach der Installation automatisch starten',
+                generateButton: '🔧 Installationsprogramm generieren',
+                successMessage: '✅ Installationsprogramm erfolgreich generiert! Der Download sollte automatisch starten.',
+                packageFound: 'gefunden und einsatzbereit',
+                packageNotFound: 'nicht gefunden. Bitte laden Sie eine benutzerdefinierte ZIP-Datei hoch.',
+                alertPackageNotFound: 'Paket nicht gefunden. Bitte wählen Sie die Option "Benutzerdefinierte ZIP-Datei hochladen".',
+                alertLoadFailed: 'Fehler beim Laden der Paketdatei:',
+                alertUploadRequired: 'Bitte laden Sie eine ZIP-Datei mit Zabbix-Binärdateien hoch!'
+            }
+        };
+        
+        // Configuration: Minimum dashes in customer prefix to treat as full hostname
+        const MIN_DASHES_FOR_FULL_HOSTNAME = 2;
+        
+        let currentLanguage = 'cze';
+        
+        function switchLanguage(lang) {
+            currentLanguage = lang;
+            
+            // Update active button
+            document.querySelectorAll('.language-switcher button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.getElementById('lang' + lang.charAt(0).toUpperCase() + lang.slice(1)).classList.add('active');
+            
+            // Update all translatable elements
+            document.querySelectorAll('[data-i18n]').forEach(element => {
+                const key = element.getAttribute('data-i18n');
+                if (translations[lang][key]) {
+                    if (element.tagName === 'INPUT' || element.tagName === 'BUTTON') {
+                        element.value = translations[lang][key];
+                    } else if (element.tagName === 'OPTION') {
+                        element.textContent = translations[lang][key];
+                    } else {
+                        element.textContent = translations[lang][key];
+                    }
+                }
+            });
+            
+            // Update package status if needed
+            if (packageCache[currentPlatform]) {
+                updatePackageStatus(currentPlatform);
+            }
+        }
+        
+        // Available package configurations (prefer CAB for Windows XP SP2+ compatibility)
+        const availablePackages = {
+            windows: ['zabbix-win.cab', 'zabbix-win.zip'],
+            linux: ['zabbix-lin.zip']
+        };
+        
+        let packageCache = {};
+        let currentPlatform = 'windows';
+        
+        // Parse URL parameters
+        function getUrlParams() {
+            const params = new URLSearchParams(window.location.search);
+            return {
+                generate: params.get('generate') === '1',
+                serverAddress: params.get('server') || params.get('serverAddress'),
+                customerPrefix: params.get('customer') || params.get('customerPrefix'),
+                autoAppendHostname: params.get('autoAppend') || params.get('autoAppendHostname'),
+                agentVersion: params.get('version') || params.get('agentVersion'),
+                installPath: params.get('path') || params.get('installPath'),
+                includeLogs: params.get('logs') || params.get('includeLogs'),
+                autoStart: params.get('autoStart'),
+                runInteractive: params.get('interactive') || params.get('runInteractive'),
+                platform: params.get('platform')
+            };
+        }
+        
+        // Build URL for form submission with parameters
+        function buildGenerateUrl() {
+            const params = new URLSearchParams();
+            params.set('generate', '1');
+            params.set('server', document.getElementById('serverAddress').value);
+            params.set('customer', document.getElementById('customerPrefix').value);
+            params.set('autoAppend', document.getElementById('autoAppendHostname').checked ? '1' : '0');
+            params.set('version', document.getElementById('agentVersion').value);
+            params.set('path', document.getElementById('installPath').value);
+            params.set('logs', document.getElementById('includeLogs').checked ? '1' : '0');
+            params.set('autoStart', document.getElementById('autoStart').checked ? '1' : '0');
+            params.set('interactive', document.getElementById('runInteractive').checked ? '1' : '0');
+            params.set('platform', currentPlatform);
+            return window.location.pathname + '?' + params.toString();
+        }
+        
+        // Auto-detect platform on page load
+        window.addEventListener('DOMContentLoaded', async function() {
+            // Parse URL parameters
+            const urlParams = getUrlParams();
+            
+            // Detect user's OS (can be overridden by URL param)
+            const userAgent = navigator.userAgent.toLowerCase();
+            if (urlParams.platform) {
+                currentPlatform = urlParams.platform;
+            } else if (userAgent.includes('win')) {
+                currentPlatform = 'windows';
+            } else if (userAgent.includes('mac') || userAgent.includes('linux')) {
+                currentPlatform = 'linux';
+            }
+            
+            // Set active platform button
+            updatePlatformUI(currentPlatform);
+            
+            // Check for available packages and version
+            await checkAvailablePackages();
+            await checkPackageVersion();
+            
+            // Pre-fill form from URL parameters if provided
+            if (urlParams.serverAddress) {
+                document.getElementById('serverAddress').value = urlParams.serverAddress;
+            }
+            if (urlParams.customerPrefix) {
+                document.getElementById('customerPrefix').value = urlParams.customerPrefix;
+            }
+            if (urlParams.autoAppendHostname !== null) {
+                document.getElementById('autoAppendHostname').checked = urlParams.autoAppendHostname === '1';
+            }
+            if (urlParams.agentVersion) {
+                document.getElementById('agentVersion').value = urlParams.agentVersion;
+            }
+            if (urlParams.installPath) {
+                document.getElementById('installPath').value = urlParams.installPath;
+            }
+            if (urlParams.includeLogs !== null) {
+                document.getElementById('includeLogs').checked = urlParams.includeLogs === '1';
+            }
+            if (urlParams.autoStart !== null) {
+                document.getElementById('autoStart').checked = urlParams.autoStart === '1';
+            }
+            if (urlParams.runInteractive !== null) {
+                document.getElementById('runInteractive').checked = urlParams.runInteractive === '1';
+            }
+            
+            // Auto-generate if generate=1 parameter is present
+            if (urlParams.generate) {
+                // Wait a bit for packages to load
+                setTimeout(() => {
+                    document.getElementById('deploymentForm').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+                }, 500);
+            }
+        });
+        
+        // Handle platform button clicks
+        document.getElementById('windowsBtn').addEventListener('click', function() {
+            currentPlatform = 'windows';
+            updatePlatformUI('windows');
+            updatePackageStatus('windows');
+            updateInstallPath('windows');
+        });
+        
+        document.getElementById('linuxBtn').addEventListener('click', function() {
+            currentPlatform = 'linux';
+            updatePlatformUI('linux');
+            updatePackageStatus('linux');
+            updateInstallPath('linux');
+        });
+        
+        function updatePlatformUI(platform) {
+            const windowsBtn = document.getElementById('windowsBtn');
+            const linuxBtn = document.getElementById('linuxBtn');
+            
+            if (platform === 'windows') {
+                windowsBtn.classList.add('active');
+                linuxBtn.classList.remove('active');
+            } else {
+                linuxBtn.classList.add('active');
+                windowsBtn.classList.remove('active');
+            }
+        }
+        
+        function updateInstallPath(platform) {
+            const installPathEl = document.getElementById('installPath');
+            if (platform === 'windows') {
+                installPathEl.value = 'C:\\zabbix';
+            } else {
+                installPathEl.value = '/opt/zabbix-agent';
+            }
+        }
+        
+        // Check for available packages on page load
+        async function checkAvailablePackages() {
+            const statusEl = document.getElementById('packageStatus');
+            statusEl.textContent = translations[currentLanguage].checkingPackages;
+            
+            // Skip auto-detection if running from file:// (local testing)
+            if (window.location.protocol === 'file:') {
+                console.log('Running locally (file://), skipping auto-detection. Files must be uploaded manually.');
+                updatePackageStatus(currentPlatform);
+                return;
+            }
+            
+            // Check each platform for available package files (try each format in order)
+            for (const [platform, filenames] of Object.entries(availablePackages)) {
+                for (const filename of filenames) {
+                    try {
+                        console.log(`Checking for ${filename}...`);
+                        const response = await fetch(filename, { method: 'HEAD' });
+                        console.log(`${filename}: ${response.status} ${response.statusText}`);
+                        if (response.ok) {
+                            packageCache[platform] = filename;
+                            console.log(`Found ${filename} for ${platform}`);
+                            break; // Use first available format
+                        }
+                    } catch (e) {
+                        console.error(`Failed to check ${filename}:`, e);
+                        // Package not available, try next format
+                    }
+                }
+            }
+            
+            console.log('Package cache:', packageCache);
+            const platform = currentPlatform;
+            updatePackageStatus(platform);
+        }
+        
+        // Check package version
+        async function checkPackageVersion() {
+            if (window.location.protocol === 'file:') {
+                return; // Skip for local testing
+            }
+            
+            try {
+                // Add cache-busting timestamp to prevent stale version display
+                const response = await fetch('_cabversion.txt?t=' + Date.now());
+                if (response.ok) {
+                    const version = (await response.text()).trim();
+                    const versionEl = document.getElementById('versionInfo');
+                    
+                    // Format: yyyymmddhhmmss -> yyyy-mm-dd hh:mm:ss
+                    const formatted = version.replace(/(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/, '$1-$2-$3 $4:$5:$6');
+                    
+                    versionEl.innerHTML = `<strong>Package Version:</strong> ${formatted} (${version})`;
+                    console.log('Package version:', version);
+                    
+                    // Store version for use in generated installers
+                    window.packageVersion = version;
+                } else {
+                    console.warn('Version file not found');
+                }
+            } catch (e) {
+                console.error('Failed to fetch version:', e);
+            }
+        }
+        
+        function updatePackageStatus(platform) {
+            const statusEl = document.getElementById('packageStatus');
+            if (packageCache[platform]) {
+                const format = packageCache[platform].endsWith('.cab') ? 'CAB' : 'ZIP';
+                const compat = format === 'CAB' ? ' (XP SP2+)' : '';
+                statusEl.innerHTML = `✅ <strong>${packageCache[platform]}</strong> ${translations[currentLanguage].packageFound}${compat}`;
+                statusEl.style.color = '#28a745';
+            } else {
+                const expectedFiles = availablePackages[platform].join(' or ');
+                statusEl.innerHTML = `⚠️ <strong>${expectedFiles}</strong> ${translations[currentLanguage].packageNotFound}`;
+                statusEl.style.color = '#ff9800';
+            }
+        }
+        
+        // Handle package source change
+        document.getElementById('packageSource').addEventListener('change', function() {
+            const uploadGroup = document.getElementById('uploadGroup');
+            const statusGroup = document.getElementById('statusGroup');
+            
+            if (this.value === 'upload') {
+                uploadGroup.style.display = 'block';
+                statusGroup.style.display = 'none';
+            } else {
+                uploadGroup.style.display = 'none';
+                statusGroup.style.display = 'block';
+            }
+        });
+        
+        document.getElementById('binariesFile').addEventListener('change', function(e) {
+            const fileName = e.target.files[0]?.name || 'No file selected';
+            document.getElementById('fileUploadText').textContent = `📦 ${fileName}`;
+        });
+        
+        // Auto-uncheck hostname append when customer prefix has 2+ dashes (on change)
+        // Auto-check hostname append when prefix ends with dash (on blur/focus lost)
+        document.getElementById('customerPrefix').addEventListener('input', function(e) {
+            const prefix = e.target.value;
+            const dashCount = (prefix.match(/-/g) || []).length;
+            const appendCheckbox = document.getElementById('autoAppendHostname');
+            
+            // Uncheck if we have 2+ dashes
+            if (dashCount >= MIN_DASHES_FOR_FULL_HOSTNAME) {
+                appendCheckbox.checked = false;
+            }
+        });
+        
+        document.getElementById('customerPrefix').addEventListener('blur', function(e) {
+            const prefix = e.target.value.trim();
+            const appendCheckbox = document.getElementById('autoAppendHostname');
+            
+            // Check if prefix ends with dash (suggests user wants to append hostname)
+            if (prefix.slice(-1) === '-') {
+                appendCheckbox.checked = true;
+            }
+        });
+        
+        document.getElementById('deploymentForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            // Check if we should redirect to URL with parameters (instead of direct generation)
+            const urlParams = getUrlParams();
+            if (!urlParams.generate) {
+                // Redirect to same page with parameters to trigger generation
+                window.location.href = buildGenerateUrl();
+                return;
+            }
+            
+            // Continue with actual generation (only when generate=1 in URL)
+            const platform = currentPlatform;
+            const packageSource = document.getElementById('packageSource').value;
+            const serverAddress = document.getElementById('serverAddress').value;
+            const customerPrefix = document.getElementById('customerPrefix').value;
+            const autoAppendHostname = document.getElementById('autoAppendHostname').checked ? '1' : '0';
+            const runInteractive = document.getElementById('runInteractive').checked;
+            const agentVersion = document.getElementById('agentVersion').value;
+            const installPath = document.getElementById('installPath').value;
+            const includeLogs = document.getElementById('includeLogs').checked;
+            const autoStart = document.getElementById('autoStart').checked;
+            
+            let base64Data;
+            
+            // Get ZIP data based on source
+            if (packageSource === 'auto') {
+                if (!packageCache[platform]) {
+                    alert(`${translations[currentLanguage].alertPackageNotFound}`);
+                    return;
+                }
+                
+                // Load from available package
+                try {
+                    const response = await fetch(packageCache[platform]);
+                    const arrayBuffer = await response.arrayBuffer();
+                    base64Data = btoa(
+                        new Uint8Array(arrayBuffer)
+                            .reduce((data, byte) => data + String.fromCharCode(byte), '')
+                    );
+                } catch (e) {
+                    alert(translations[currentLanguage].alertLoadFailed + ' ' + e.message);
+                    return;
+                }
+            } else {
+                // Use uploaded file
+                const binariesFile = document.getElementById('binariesFile').files[0];
+                if (!binariesFile) {
+                    alert(translations[currentLanguage].alertUploadRequired);
+                    return;
+                }
+                
+                // Read ZIP file as base64
+                base64Data = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        const b64 = btoa(
+                            new Uint8Array(event.target.result)
+                                .reduce((data, byte) => data + String.fromCharCode(byte), '')
+                        );
+                        resolve(b64);
+                    };
+                    reader.onerror = reject;
+                    reader.readAsArrayBuffer(binariesFile);
+                });
+            }
+            
+            // Generate the installer script
+            let installerScript;
+            if (platform === 'windows') {
+                installerScript = generateBatchInstaller({
+                    serverAddress,
+                    customerPrefix,
+                    autoAppendHostname,
+                    runInteractive,
+                    agentVersion,
+                    installPath,
+                    includeLogs,
+                    autoStart,
+                    base64Data,
+                    packageVersion: window.packageVersion || 'unknown'
+                });
+                downloadFile('zabbix-agent-installer.bat', installerScript);
+            } else {
+                installerScript = generateBashInstaller({
+                    serverAddress,
+                    customerPrefix,
+                    runInteractive,
+                    agentVersion,
+                    installPath,
+                    includeLogs,
+                    autoStart,
+                    base64Data,
+                    packageVersion: window.packageVersion || 'unknown'
+                });
+                downloadFile('zabbix-agent-installer.sh', installerScript);
+            }
+            
+            // Show success message
+            document.getElementById('successMessage').style.display = 'block';
+            setTimeout(() => {
+                document.getElementById('successMessage').style.display = 'none';
+            }, 5000);
+        });
+        
+        function generateBatchInstaller(config) {
+            return `@echo off
+setlocal enabledelayedexpansion
+
+:: ============================================================================
+:: Zabbix Agent Bootstrap Installer
+:: Generated: ${new Date().toISOString()}
+:: Package Version: ${config.packageVersion}
+:: This script extracts Zabbix files to a subfolder and calls the main installer
+:: After installation, the subfolder remains for interactive re-configuration
+:: ============================================================================
+
+:: Extract to subfolder in current directory
+set "EXTRACT_DIR=%~dp0zabbix_install"
+
+echo ================================================
+echo   Zabbix Agent Bootstrap Installer
+echo ================================================
+echo.
+echo Extraction folder: %EXTRACT_DIR%
+echo.
+
+:: Check for admin rights
+net session >nul 2>&1
+if %ERRORLEVEL% NEQ 0 (
+    echo ERROR: This installer requires administrator privileges!
+    echo Please run as administrator.
+    pause
+    exit /b 1
+)
+
+:: Create extraction directory
+echo Creating extraction directory...
+if exist "%EXTRACT_DIR%" (
+    echo WARNING: Directory already exists. Contents will be overwritten.
+    rmdir /s /q "%EXTRACT_DIR%" 2>nul
+)
+mkdir "%EXTRACT_DIR%" 2>nul
+
+echo Extracting embedded files...
+call :EXTRACT_ARCHIVE "%EXTRACT_DIR%"
+
+:: Write installation state files
+echo 1 > "%EXTRACT_DIR%\\install\\.installsrcdir"
+echo ${config.agentVersion} > "%EXTRACT_DIR%\\install\\.useagent"
+
+:: Write version file
+echo ${config.packageVersion} > "%EXTRACT_DIR%\\_cabversion.txt"
+
+:: Update .baseval.ini with web form values
+:: Parameter order: inied.bat set "file.ini" "key" "value" "instnote" "section"
+echo Updating .baseval.ini with configuration values...
+call "%EXTRACT_DIR%\\install\\inied.bat" set "%EXTRACT_DIR%\\install\\.baseval.ini" "ServerActive" "${config.serverAddress}" "##::" "default"
+if errorlevel 1 echo ERROR: Failed to update ServerActive
+call "%EXTRACT_DIR%\\install\\inied.bat" set "%EXTRACT_DIR%\\install\\.baseval.ini" "Hostname" "${config.customerPrefix}" "##::" "default"
+if errorlevel 1 echo ERROR: Failed to update Hostname
+call "%EXTRACT_DIR%\\install\\inied.bat" set "%EXTRACT_DIR%\\install\\.baseval.ini" "InstallPath" "${config.installPath}" "##::" "bootstrap-silent-install-only"
+if errorlevel 1 echo ERROR: Failed to update InstallPath
+call "%EXTRACT_DIR%\\install\\inied.bat" set "%EXTRACT_DIR%\\install\\.baseval.ini" "AutoAppendHostname" "${config.autoAppendHostname}" "##::" "bootstrap-silent-install-only"
+if errorlevel 1 echo ERROR: Failed to update AutoAppendHostname
+call "%EXTRACT_DIR%\\install\\inied.bat" set "%EXTRACT_DIR%\\install\\.baseval.ini" "AutoStart" "${config.autoStart ? '1' : '0'}" "##::" "bootstrap-silent-install-only"
+if errorlevel 1 echo ERROR: Failed to update AutoStart
+call "%EXTRACT_DIR%\\install\\inied.bat" set "%EXTRACT_DIR%\\install\\.baseval.ini" "CreateLogs" "${config.includeLogs ? '1' : '0'}" "##::" "bootstrap-silent-install-only"
+if errorlevel 1 echo ERROR: Failed to update CreateLogs
+echo Configuration update completed.
+echo.
+echo DEBUG: Verifying .baseval.ini content:
+findstr /C:"InstallPath=" /C:"ServerActive=" /C:"Hostname=" "%EXTRACT_DIR%\\install\\.baseval.ini"
+echo.
+echo.
+echo Calling main installation script...
+cd /d "%EXTRACT_DIR%\\install"
+call install.bat${config.runInteractive ? '' : ' /SILENT'}
+
+set "INSTALL_RESULT=%ERRORLEVEL%"
+
+:: Return to original directory
+cd /d "%~dp0"
+
+if %INSTALL_RESULT% EQU 0 (
+    echo.
+    echo ================================================
+    echo Installation completed successfully!
+    echo ================================================
+    echo.
+    echo Installation files preserved in: %EXTRACT_DIR%
+    echo To reconfigure, run: %EXTRACT_DIR%\\install\\install.bat
+) else (
+    echo.
+    echo ================================================
+    echo Installation failed with error code: %INSTALL_RESULT%
+    echo ================================================
+)
+
+pause
+exit /b %INSTALL_RESULT%
+
+:: ============================================================================
+:: Extract embedded base64-encoded archive (Windows XP+ compatible)
+:: Uses only built-in command-line utilities: certutil, expand, debug
+:: ============================================================================
+:EXTRACT_ARCHIVE
+set "OUTPUT_DIR=%~1"
+set "B64_FILE=%OUTPUT_DIR%\\zabbix_data_%RANDOM%.b64"
+set "ARCHIVE_FILE=%OUTPUT_DIR%\\zabbix_data_%RANDOM%.dat"
+
+echo Writing encoded data...
+call :WRITE_BASE64_DATA > "%B64_FILE%"
+
+echo Decoding data...
+:: certutil is available from Windows XP SP2+ and Server 2003 SP1+
+certutil -decode "%B64_FILE%" "%ARCHIVE_FILE%" >nul 2>&1
+if %ERRORLEVEL% NEQ 0 (
+    echo ERROR: Failed to decode embedded data!
+    echo This requires Windows XP SP2 or later with certutil.exe
+    del "%B64_FILE%" 2>nul
+    exit /b 1
+)
+
+
+del "%B64_FILE%" 2>nul
+
+echo Extracting archive...
+:: Check file signature to determine format
+set "IS_CAB=0"
+set "IS_ZIP=0"
+
+:: Try CAB extraction first (most compatible)
+:: Note: Output must NOT be redirected or expand.exe may skip files
+expand "%ARCHIVE_FILE%" -F:* "%OUTPUT_DIR%"
+if %ERRORLEVEL% EQU 0 (
+    echo Detected CAB format, extracted successfully.
+    goto :EXTRACT_SUCCESS
+)
+
+:: If CAB failed, try ZIP with tar (Windows 10 1803+)
+where tar.exe >nul 2>&1
+if %ERRORLEVEL% EQU 0 (
+    tar -xf "%ARCHIVE_FILE%" -C "%OUTPUT_DIR%" >nul 2>&1
+    if %ERRORLEVEL% EQU 0 (
+        echo Detected ZIP format, extracted with tar.
+        goto :EXTRACT_SUCCESS
+    )
+)
+
+:: Try PowerShell as last resort
+where powershell.exe >nul 2>&1
+if %ERRORLEVEL% EQU 0 (
+    powershell -Command "Expand-Archive -Path '%ARCHIVE_FILE%' -DestinationPath '%OUTPUT_DIR%' -Force" 2>nul
+    if %ERRORLEVEL% EQU 0 (
+        echo Detected ZIP format, extracted with PowerShell.
+        goto :EXTRACT_SUCCESS
+    )
+)
+
+echo ERROR: Failed to extract archive!
+echo Archive may be corrupted or in unsupported format.
+echo Supported formats: CAB (XP SP2+), ZIP (Win10+ or PowerShell)
+del "%ARCHIVE_FILE%" 2>nul
+exit /b 1
+) else (
+    echo ERROR: Unknown archive format!
+    del "%ARCHIVE_FILE%" 2>nul
+    exit /b 1
+)
+
+:EXTRACT_SUCCESS
+:: Cleanup temporary files
+del "%ARCHIVE_FILE%" 2>nul
+goto :EOF
+
+:: ============================================================================
+:: Write base64-encoded data
+:: NOTE: The "CERTIFICATE" markers are used as delimiters for the embedded
+::       base64-encoded archive (CAB/ZIP). This is NOT an actual certificate,
+::       just using the PEM format convention for easy text-based data storage.
+:: ============================================================================
+:WRITE_BASE64_DATA
+echo -----BEGIN CERTIFICATE-----
+${config.base64Data.match(/.{1,1536}/g).map(line => `echo ${line}`).join('\n')}
+echo -----END CERTIFICATE-----
+goto :EOF
+
+:: ============================================================================
+:: EMBEDDED ARCHIVE DATA (BASE64-ENCODED)
+:: ============================================================================
+:: The data between "BEGIN CERTIFICATE" and "END CERTIFICATE" markers below
+:: is a base64-encoded archive file (CAB or ZIP) containing the Zabbix agent
+:: installation files. This is NOT an actual security certificate - we're just
+:: using the PEM certificate format convention as a convenient way to embed
+:: binary data as text within this batch script. The certutil tool decodes it.
+:: ============================================================================
+
+-----BEGIN CERTIFICATE-----
+${config.base64Data.match(/.{1,1536}/g).join('\n')}
+-----END CERTIFICATE-----
+`;
+        }
+        
+        function generateBashInstaller(config) {
+            return `#!/bin/bash
+################################################################################
+# Zabbix Agent Self-Extracting Installer
+# Generated: ${new Date().toISOString()}
+# Server: ${config.serverAddress}
+# Agent Version: ${config.agentVersion}
+################################################################################
+
+set -e
+
+INSTALL_PATH="${config.installPath}"
+SERVER_ADDRESS="${config.serverAddress}"
+CUSTOMER_PREFIX="${config.customerPrefix}"
+AGENT_VERSION="${config.agentVersion}"
+AUTO_START="${config.autoStart ? '1' : '0'}"
+CREATE_LOGS="${config.includeLogs ? '1' : '0'}"
+
+echo "================================================"
+echo "  Zabbix Agent v\${AGENT_VERSION} Installer"
+echo "================================================"
+echo "Installation path: \${INSTALL_PATH}"
+echo "Server: \${SERVER_ADDRESS}"
+echo ""
+
+# Check for root privileges
+if [[ \${EUID} -ne 0 ]]; then
+    echo "ERROR: This installer must be run as root (use sudo)"
+    exit 1
+fi
+
+# Detect OS
+if [[ "\${OSTYPE}" == "linux-gnu"* ]]; then
+    OS="linux"
+    if command -v systemctl &> /dev/null; then
+        INIT_SYSTEM="systemd"
+    else
+        INIT_SYSTEM="sysvinit"
+    fi
+elif [[ "\${OSTYPE}" == "darwin"* ]]; then
+    OS="macos"
+    INIT_SYSTEM="launchd"
+else
+    echo "ERROR: Unsupported operating system: \${OSTYPE}"
+    exit 1
+fi
+
+# Create temporary directory
+TEMP_DIR="/tmp/zabbix_install_\${RANDOM}"
+mkdir -p "\${TEMP_DIR}"
+
+echo "Extracting files..."
+extract_archive "\${TEMP_DIR}"
+
+echo "Creating installation directory..."
+mkdir -p "\${INSTALL_PATH}"
+
+echo "Copying files..."
+rsync -av "\${TEMP_DIR}/" "\${INSTALL_PATH}/" || cp -r "\${TEMP_DIR}"/* "\${INSTALL_PATH}/"
+
+if [[ "\${CREATE_LOGS}" == "1" ]]; then
+    echo "Creating log directories..."
+    mkdir -p "\${INSTALL_PATH}/log/agent"
+    mkdir -p "\${INSTALL_PATH}/log/agent2"
+fi
+
+# Configure agent
+echo "Configuring agent..."
+read -p "Enter hostname (prefix: \${CUSTOMER_PREFIX}): " HOSTNAME
+FULL_HOSTNAME="\${CUSTOMER_PREFIX}\${HOSTNAME}"
+
+if [[ "\${AGENT_VERSION}" == "2" ]]; then
+    CONF_FILE="\${INSTALL_PATH}/conf/zabbix_agent2.conf"
+    EXE="\${INSTALL_PATH}/bin/zabbix_agent2"
+    SERVICE_NAME="zabbix-agent2"
+else
+    CONF_FILE="\${INSTALL_PATH}/conf/zabbix_agentd.conf"
+    EXE="\${INSTALL_PATH}/bin/zabbix_agentd"
+    SERVICE_NAME="zabbix-agent"
+fi
+
+# Update configuration
+sed -i.bak \\
+    -e "s/^Server=.*/Server=\${SERVER_ADDRESS}/" \\
+    -e "s/^ServerActive=.*/ServerActive=\${SERVER_ADDRESS}/" \\
+    -e "s/^Hostname=.*/Hostname=\${FULL_HOSTNAME}/" \\
+    "\${CONF_FILE}"
+
+# Make binary executable
+chmod +x "\${EXE}"
+
+# Install service
+echo "Installing service..."
+if [[ "\${INIT_SYSTEM}" == "systemd" ]]; then
+    cat > "/etc/systemd/system/\${SERVICE_NAME}.service" <<EOF
+[Unit]
+Description=Zabbix Agent \${AGENT_VERSION}
+After=network.target
+
+[Service]
+Type=forking
+PIDFile=/tmp/zabbix_agent.pid
+ExecStart=\${EXE} --config \${CONF_FILE}
+ExecStop=/bin/kill -SIGTERM \\\$MAINPID
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload
+    systemctl enable "\${SERVICE_NAME}"
+elif [[ "\${INIT_SYSTEM}" == "launchd" ]]; then
+    cat > "/Library/LaunchDaemons/com.zabbix.agent\${AGENT_VERSION}.plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.zabbix.agent\${AGENT_VERSION}</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>\${EXE}</string>
+        <string>--config</string>
+        <string>\${CONF_FILE}</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+</dict>
+</plist>
+EOF
+    launchctl load "/Library/LaunchDaemons/com.zabbix.agent\${AGENT_VERSION}.plist"
+fi
+
+if [[ "\${AUTO_START}" == "1" ]]; then
+    echo "Starting service..."
+    if [[ "\${INIT_SYSTEM}" == "systemd" ]]; then
+        systemctl start "\${SERVICE_NAME}"
+    elif [[ "\${INIT_SYSTEM}" == "launchd" ]]; then
+        launchctl start "com.zabbix.agent\${AGENT_VERSION}"
+    fi
+fi
+
+# Cleanup
+echo "Cleaning up temporary files..."
+rm -rf "\${TEMP_DIR}"
+
+echo ""
+echo "================================================"
+echo "Installation completed successfully!"
+echo "================================================"
+echo "Service: \${SERVICE_NAME}"
+echo "Configuration: \${CONF_FILE}"
+echo "Logs: \${INSTALL_PATH}/log"
+echo "================================================"
+
+exit 0
+
+################################################################################
+# Extract embedded archive
+################################################################################
+extract_archive() {
+    local OUTPUT_DIR="\$1"
+    local TAR_FILE="/tmp/zabbix_temp_\${RANDOM}.tar.gz"
+    
+    echo "Decoding archive..."
+    # Base64 encoded data
+    cat > "\${TAR_FILE}.b64" <<'EOFBASE64'
+${config.base64Data}
+EOFBASE64
+    
+    # Decode base64
+    base64 -d "\${TAR_FILE}.b64" > "\${TAR_FILE}"
+    
+    # Extract archive
+    tar -xzf "\${TAR_FILE}" -C "\${OUTPUT_DIR}"
+    
+    # Cleanup
+    rm -f "\${TAR_FILE}.b64" "\${TAR_FILE}"
+}
+`;
+        }
+        
+        function downloadFile(filename, content) {
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        }
+    </script>
+</body>
+</html>

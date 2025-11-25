@@ -1,0 +1,12 @@
+# Log Directory Placeholder - Agent v1
+#
+# This directory contains log files for Zabbix Agent v1 (zabbix_agentd).
+# 
+# The log file path is configured in zabbix_agentd.conf:
+# LogFile=%%INSTALL_PATH%%\log\agent\agent.log.txt
+#
+# During installation, this directory is created automatically and
+# the installer expands the %%INSTALL_PATH%% macro to the actual path.
+#
+# Log files are excluded from git (see .gitignore).
+# This placeholder ensures the directory structure exists in the repository.

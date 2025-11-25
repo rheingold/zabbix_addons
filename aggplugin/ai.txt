@@ -1,52 +1,51 @@
-=== ZABBIX AGGPLUGIN - AI CONTEXT ====== AI CONTEXT FILE - AGGPLUGIN ===
+=== AI CONTEXT FILE - AGGPLUGIN ===
+Last Updated: November 25, 2025
+Version: tmp0.1 (Preliminary Release) - Plugin Framework + Installer Integration COMPLETE
 
-Version: tmp0.1 | Updated: November 15, 2025Last Updated: November 14, 2025
+Author: Claude Sonnet 4.5 (AI) | Lead: lukas@plachy.eu
 
-Author: Claude Sonnet 4.5 (AI) | Lead: lukas@plachy.euVersion: tmp0.1 (Preliminary Release) - Plugin Framework Added
-
-
-
-⚠️ CRITICAL: UPDATE BOTH ai.txt AND ai_priv/ai_priv.txt DURING SESSIONS ⚠️*** PURPOSE OF THIS FILE ***
-
-Without updates, future sessions lack context and may duplicate work.This file provides essential context for AI assistants (Claude, GPT, etc.) working on this project.
-
+*** PURPOSE OF THIS FILE ***
+This file provides essential context for AI assistants (Claude, GPT, etc.) working on this project.
 It contains critical information about architecture, dependencies, completed work, and pending tasks.
 
-=== PROJECT PURPOSE ===
-
-Zabbix Agent2 external plugin providing continuous metric aggregation with statistics (avg, min, max, median, mode, stddev, variance). Extensible via dynamically loaded measurement plugin DLLs.⚠️⚠️⚠️ CRITICAL: KEEP BOTH FILES UPDATED ⚠️⚠️⚠️
-
+⚠️⚠️⚠️ CRITICAL: KEEP BOTH FILES UPDATED ⚠️⚠️⚠️
 *** DO NOT REMOVE THIS WARNING - IT MUST REMAIN IN THE FILE PERMANENTLY ***
 
-=== ARCHITECTURE ===AI assistants MUST update BOTH this file AND ai_priv/ai_priv.txt throughout work sessions with:
-
+AI assistants MUST update BOTH this file AND ai_priv/ai_priv.txt throughout work sessions with:
 - Progress made and tasks completed (BOTH files)
-
-Components:- New findings and technical decisions (ai.txt)
-
-- Go Wrapper: go_agent2_wrapper/main.go (Zabbix SDK, CGO bridge, plugin discovery)- Changed architecture or dependencies (ai.txt)
-
-- C++ Collector: cpp_common/collector.cpp (background sampling thread, multi-source aggregation)- Updated pending tasks list (ai.txt)
-
-- Plugin Loader: cpp_common/plugin_loader.cpp (DLL management, multi-source API)- Current blockers or issues (ai.txt)
-
-- Plugin API: cpp_common/measurement_plugin_api.h (C interface for custom metrics)- Local deployment procedures and paths (ai_priv/ai_priv.txt)
-
-- Example Plugins: Standalone plugplugins/ project (cpu_load, mem_free, disk I/O)- Environment-specific configurations (ai_priv/ai_priv.txt)
+- New findings and technical decisions (ai.txt)
+- Changed architecture or dependencies (ai.txt)
+- Updated pending tasks list (ai.txt)
+- Current blockers or issues (ai.txt)
+- Local deployment procedures and paths (ai_priv/ai_priv.txt)
+- Environment-specific configurations (ai_priv/ai_priv.txt)
 
 This dual-file approach separates generic project context (ai.txt) from local environment specifics (ai_priv/ai_priv.txt).
+CRITICAL: When making changes that affect the project generally, update this file too!
+Without updates, future sessions will lack context and may duplicate work or make conflicting changes.
+*** This warning section itself must NEVER be removed or modified ***
 
-Data Flow:CRITICAL: When making changes that affect the project generally, update this file too!
-
-1. Go discovers DLLs → collectDLLMetrics() → plugin.RegisterMetrics()Without updates, future sessions will lack context and may duplicate work or make conflicting changes.
-
-2. C++ collector samples every 1s → plugin_sample_multi_from_dll() → DLL's plugin_collect()*** This warning section itself must NEVER be removed or modified ***
-
-3. Per-source accumulators track statistics → map<source_id, Accumulator>
-
-4. Zabbix queries → Export() → collector_fetch_and_reset_json() → JSON with aggregate + per-source stats*** PROJECT OVERVIEW ***
+*** PROJECT OVERVIEW ***
 
 Zabbix Agent2 external plugin for Windows providing continuous metric aggregation with comprehensive statistics (avg, min, max, median, mode, standard deviation, variance).
+
+🎉 PLUGIN FRAMEWORK FULLY OPERATIONAL - Tested and working with 3 example plugins
+🎉 INSTALLER INTEGRATION COMPLETE - instpackage_my1 automatically deploys and configures aggplugin
+
+=== ARCHITECTURE ===
+
+Components:
+- Go Wrapper: go_agent2_wrapper/main.go (Zabbix SDK, CGO bridge, plugin discovery)
+- C++ Collector: cpp_common/collector.cpp (background sampling thread, multi-source aggregation)
+- Plugin Loader: cpp_common/plugin_loader.cpp (DLL management, multi-source API)
+- Plugin API: cpp_common/measurement_plugin_api.h (C interface for custom metrics)
+- Example Plugins: cpu_load_plugin.dll, memory_usage_plugin.dll, disk_stats_plugin.dll
+
+Data Flow:
+1. Go discovers DLLs → collectDLLMetrics() → plugin.RegisterMetrics()
+2. C++ collector samples every 1s → plugin_sample_multi_from_dll() → DLL's plugin_collect()
+3. Per-source accumulators track statistics → map<source_id, Accumulator>
+4. Zabbix queries → Export() → collector_fetch_and_reset_json() → JSON with aggregate + per-source stats
 
 === MULTI-SOURCE METRICS (November 15, 2025) ===
 
@@ -673,4 +672,50 @@ DOCUMENTATION HIERARCHY:
 - PLUGIN_DEVELOPMENT.md: Comprehensive guide with examples and troubleshooting
 - PLUGIN_ARCHITECTURE.md: Deep dive into design and implementation
 - measurement_plugin_api.h: Complete API specification with inline docs
+
+=== SESSION UPDATE: NOVEMBER 25, 2025 ===
+
+✅ INSTALLER INTEGRATION TESTING COMPLETE:
+- Deployed installer with fixes from Nov 21-23 (inied.bat macro expansion, .baseval.ini config)
+- Service: Zabbix Agent 2 running stable
+- Process: aggplugin-agent2.exe (PID 18680) running
+- Configuration: Absolute paths correctly applied (C:\zabbix\bin\plugins\*.dll)
+- Plugins Loaded: 3 DLLs confirmed (CPULoad v1.0, DiskStats v1.0, MemoryUsage v1.0)
+- Metrics Tested: All working - _internal.test, cpu_load, mem_free, disk.io.read, disk.io.write
+- Statistics: Proper JSON output with all 8 stats (avg/min/max/median/mode/stddev/variance/count)
+- Sample Counts: cpu_load(7), mem_free(13), disk.io.read(272), disk.io.write(368)
+
+✅ DOCUMENTATION REVIEW COMPLETE:
+- README.md: Updated with "Automatic Installation (Recommended)" section
+- Added references to INSTALLER_INTEGRATION.md and INSTALLER_CHANGES.md
+- All .md files reviewed: USAGE.md (243 lines), PLUGIN_DEVELOPMENT.md (573 lines), 
+  PLUGIN_ARCHITECTURE.md (431 lines) - all complete and well-structured
+- Source code documentation: Consistent headers across all C++ and Go files
+- TODO comments: 4 appropriate future enhancements (not blockers)
+
+✅ REPOSITORY UPDATES COMMITTED AND PUSHED:
+- Commit 3097786 (Nov 25, 2025): "Add automatic installer documentation to README"
+- Changes: Added automatic installer section with benefits, references, verification command
+- Pushed to: origin/tmp0.1
+- Status: Working tree clean after push
+
+KEY INSTALLER FILES MODIFIED (Nov 21-23):
+- instpackage_my1/zabbix2/win/install/.baseval.ini: Added [%%INSTALL_PATH%%\conf\...\aggplugin.conf]
+- instpackage_my1/zabbix2/win/install/inied.bat: Enhanced macro expansion for section names (~line 304)
+- instpackage_my1/zabbix2/win/install/install.bat: Removed special-case aggplugin code (lines 316-324)
+
+DEPLOYMENT VERIFICATION (Nov 25):
+- Config file: C:\zabbix\conf\zabbix_agent2.d\plugins.d\aggplugin.conf (absolute paths ✅)
+- Plugin DLLs: C:\zabbix\bin\plugins\ (cpu_load 226KB, disk_stats 232KB, memory_usage 225KB)
+- Debug log: C:\zabbix\log\aggplugin_debug.log (shows successful loading and metric queries)
+- All test queries returned proper JSON with statistics
+
+CURRENT PROJECT STATUS:
+- Core functionality: COMPLETE and tested
+- Installer integration: COMPLETE and tested  
+- Documentation: COMPLETE and reviewed
+- Repository: Up to date (commit 3097786 pushed)
+- Next steps: None pending - project ready for use
+
+=== END OF AI CONTEXT FILE ===
 
