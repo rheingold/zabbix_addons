@@ -1,0 +1,16 @@
+# Binary Placeholder - privoxy.exe
+# 
+# This placeholder indicates where the Privoxy proxy executable should be placed.
+# 
+# Source: Privoxy official distribution
+# Download from: https://www.privoxy.org/
+# File: privoxy.exe (Windows)
+# Typical size: ~500 KB
+#
+# Installation instructions:
+# 1. Download Privoxy for Windows from the official website
+# 2. Extract privoxy.exe from the archive
+# 3. Place it in this directory: win\bin\
+# 4. This file will be automatically excluded from git (see .gitignore)
+#
+# Note: Privoxy is optional and used for proxy functionality

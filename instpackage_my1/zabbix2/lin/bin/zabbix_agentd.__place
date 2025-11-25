@@ -1,0 +1,15 @@
+# Binary Placeholder - zabbix_agentd (Linux/macOS)
+# 
+# This placeholder indicates where the Zabbix Agent v1 executable should be placed.
+# 
+# Source: Zabbix official distribution
+# Download from: https://www.zabbix.com/download_agents
+# File: zabbix_agentd (Linux/macOS, 64-bit)
+# Typical size: ~3-5 MB
+#
+# Installation instructions:
+# 1. Download the Zabbix agent for your platform (Linux or macOS)
+# 2. Extract zabbix_agentd from the archive
+# 3. Place it in this directory: lin/bin/
+# 4. Make it executable: chmod +x lin/bin/zabbix_agentd
+# 5. This file will be automatically excluded from git (see .gitignore)

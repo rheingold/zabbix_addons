@@ -1,0 +1,14 @@
+# Binary Placeholder - zabbix_get.exe
+# 
+# This placeholder indicates where the Zabbix Get utility should be placed.
+# 
+# Source: Zabbix official distribution
+# Download from: https://www.zabbix.com/download_agents
+# File: zabbix_get.exe (Windows 64-bit)
+# Typical size: ~1-2 MB
+#
+# Installation instructions:
+# 1. Download the Zabbix agent for Windows from the official website
+# 2. Extract zabbix_get.exe from the archive
+# 3. Place it in this directory: win\bin\
+# 4. This file will be automatically excluded from git (see .gitignore)

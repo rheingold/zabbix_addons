@@ -1,0 +1,14 @@
+# Binary Placeholder - aggplugin-agent2.exe
+# 
+# This placeholder indicates where the Aggplugin executable should be placed.
+# 
+# Source: Custom Zabbix plugin
+# File: aggplugin-agent2.exe (Windows 64-bit)
+# Typical size: ~2-4 MB
+#
+# Installation instructions:
+# 1. Build or obtain the aggplugin executable for your platform
+# 2. Place it in this directory: win\bin\
+# 3. This file will be automatically excluded from git (see .gitignore)
+#
+# Note: This is a custom plugin for aggregation functionality

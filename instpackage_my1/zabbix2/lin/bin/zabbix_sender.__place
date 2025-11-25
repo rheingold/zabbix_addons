@@ -1,0 +1,15 @@
+# Binary Placeholder - zabbix_sender (Linux/macOS)
+# 
+# This placeholder indicates where the Zabbix Sender utility should be placed.
+# 
+# Source: Zabbix official distribution
+# Download from: https://www.zabbix.com/download_agents
+# File: zabbix_sender (Linux/macOS, 64-bit)
+# Typical size: ~1-2 MB
+#
+# Installation instructions:
+# 1. Download the Zabbix agent for your platform (Linux or macOS)
+# 2. Extract zabbix_sender from the archive
+# 3. Place it in this directory: lin/bin/
+# 4. Make it executable: chmod +x lin/bin/zabbix_sender
+# 5. This file will be automatically excluded from git (see .gitignore)

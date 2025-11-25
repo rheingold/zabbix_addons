@@ -1,0 +1,21 @@
+# Plugin DLL Placeholder Directory
+# 
+# This directory contains plugin DLL files for Zabbix Agent 2 with Aggplugin.
+# 
+# Source: Custom measurement plugins
+# Files: *.dll (Windows 64-bit)
+# Typical size: 50-500 KB per DLL
+#
+# Installation instructions:
+# 1. Build or obtain the measurement plugin DLLs
+# 2. Place them in this directory: win\bin\plugins\
+# 3. These files will be automatically excluded from git (see .gitignore)
+#
+# Plugin DLLs are loaded by aggplugin-agent2.exe based on the configuration:
+# Plugins.Aggplugin.PluginPath=%%INSTALL_PATH%%\bin\plugins\*.dll
+#
+# Common plugin examples:
+# - cpu_plugin.dll (CPU monitoring)
+# - disk_plugin.dll (Disk I/O monitoring)
+# - network_plugin.dll (Network monitoring)
+# - custom measurement plugins as needed

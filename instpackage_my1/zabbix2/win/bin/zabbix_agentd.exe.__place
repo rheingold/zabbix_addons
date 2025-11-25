@@ -1,0 +1,14 @@
+# Binary Placeholder - zabbix_agentd.exe
+# 
+# This placeholder indicates where the Zabbix Agent v1 executable should be placed.
+# 
+# Source: Zabbix official distribution
+# Download from: https://www.zabbix.com/download_agents
+# File: zabbix_agentd.exe (Windows 64-bit)
+# Typical size: ~3-5 MB
+#
+# Installation instructions:
+# 1. Download the Zabbix agent for Windows from the official website
+# 2. Extract zabbix_agentd.exe from the archive
+# 3. Place it in this directory: win\bin\
+# 4. This file will be automatically excluded from git (see .gitignore)
