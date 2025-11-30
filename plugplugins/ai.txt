@@ -1,6 +1,9 @@
-ï»¿# Zabbix Aggplugin - Measurement Plugins Project
+# Zabbix Aggplugin - Measurement Plugins Project
 
 ## Project Overview
+
+**Last Updated:** November 30, 2025
+**Status:** All plugins synced to aggplugin/example_plugins and tested
 Standalone project for building custom measurement plugin DLLs that extend Zabbix Aggplugin with custom system metrics.
 
 ## Architecture
@@ -167,9 +170,9 @@ Zabbix receives (after 120 samples):
 
 ## Performance Considerations
 
-**Sampling interval:** Base interval (default 1 second) Ã— multiplicator
-**Memory per metric:** ~8KB (1000 samples Ã— 8 bytes/double)
-**Multi-source overhead:** Linear with source count (O(sources Ã— samples))
+**Sampling interval:** Base interval (default 1 second) × multiplicator
+**Memory per metric:** ~8KB (1000 samples × 8 bytes/double)
+**Multi-source overhead:** Linear with source count (O(sources × samples))
 
 ## Future Enhancements
 
@@ -229,3 +232,4 @@ aggplugin_debug.log
 
 Author: Claude Sonnet 4.5 (AI Assistant)
 Lead & Architecture: lukas@plachy.eu
+
