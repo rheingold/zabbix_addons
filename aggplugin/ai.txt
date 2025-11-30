@@ -107,7 +107,11 @@ Plugin-based (DLL):- Thread-safe: Plugin collection runs in background thread
 
 - aggplugin.disk.io.read - Disk reads/sec (disk_stats_plugin.dll, multi-source per disk)
 
-- aggplugin.disk.io.write - Disk writes/sec (disk_stats_plugin.dll, multi-source per disk)KEY TECHNICAL DETAILS:
+- aggplugin.disk.io.write - Disk writes/sec (disk_stats_plugin.dll, multi-source per disk)
+
+- aggplugin.disk.queue.length - Avg disk queue length (disk_stats_plugin.dll, multi-source per disk)
+
+KEY TECHNICAL DETAILS:
 
 - Sampling: Background thread samples metrics every 1 second
 

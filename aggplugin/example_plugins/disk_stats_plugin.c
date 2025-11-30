@@ -20,6 +20,7 @@
  * METRICS EXPOSED:
  *   - disk.io.read[device]  - Disk read operations/sec (per physical disk)
  *   - disk.io.write[device] - Disk write operations/sec (per physical disk)
+ *   - disk.queue.length[device] - Average disk queue length (per physical disk)
  *
  * NOTES:
  *   - Uses Windows PDH (Performance Data Helper) API
@@ -46,6 +47,7 @@ typedef struct {
     int disk_num;
     PDH_HCOUNTER read_counter;
     PDH_HCOUNTER write_counter;
+    PDH_HCOUNTER queue_counter;
 } disk_counter_t;
 
 #define MAX_DISKS 16
@@ -68,6 +70,13 @@ static const metric_key_info_t plugin_keys[] = {
         "disk.io.write",
         "Disk write operations per second (per physical disk)",
         METRIC_TYPE_UINT64,
+        "device",
+        1  // has_multiple_sources
+    },
+    {
+        "disk.queue.length",
+        "Average disk queue length (per physical disk)",
+        METRIC_TYPE_FLOAT,
         "device",
         1  // has_multiple_sources
     }
@@ -136,9 +145,21 @@ PLUGIN_EXPORT int plugin_init(const char* config_section) {
             continue;
         }
         
+        snprintf(counter_path, sizeof(counter_path), 
+                 "\\PhysicalDisk(%d *)\\Avg. Disk Queue Length", i);
+        
+        PDH_HCOUNTER queue_counter;
+        status = PdhAddEnglishCounter(query, counter_path, 0, &queue_counter);
+        if (status != ERROR_SUCCESS) {
+            // Should not happen if read counter succeeded
+            fprintf(stderr, "DiskStatsPlugin: Failed to add queue counter for disk %d\n", i);
+            continue;
+        }
+        
         disk_counters[disk_count].disk_num = i;
         disk_counters[disk_count].read_counter = read_counter;
         disk_counters[disk_count].write_counter = write_counter;
+        disk_counters[disk_count].queue_counter = queue_counter;
         disk_count++;
     }
     
@@ -158,7 +179,7 @@ PLUGIN_EXPORT int plugin_init(const char* config_section) {
 /**
  * plugin_collect - Collect disk I/O measurements
  * 
- * Returns two collection_result_t entries (one for reads, one for writes).
+ * Returns three collection_result_t entries (reads, writes, queue length).
  * Each result contains multiple measurement_value_t (one per disk).
  */
 PLUGIN_EXPORT size_t plugin_collect(collection_result_t* results) {
@@ -173,7 +194,12 @@ PLUGIN_EXPORT size_t plugin_collect(collection_result_t* results) {
         results[1].value_count = 0;
         results[1].values = NULL;
         
-        return 2;
+        results[2].key = "disk.queue.length";
+        results[2].status = COLLECT_ERROR;
+        results[2].value_count = 0;
+        results[2].values = NULL;
+        
+        return 3;
     }
     
     // Collect PDH data
@@ -190,7 +216,12 @@ PLUGIN_EXPORT size_t plugin_collect(collection_result_t* results) {
         results[1].value_count = 0;
         results[1].values = NULL;
         
-        return 2;
+        results[2].key = "disk.queue.length";
+        results[2].status = COLLECT_ERROR;
+        results[2].value_count = 0;
+        results[2].values = NULL;
+        
+        return 3;
     }
     
     // Allocate measurement arrays
@@ -198,10 +229,12 @@ PLUGIN_EXPORT size_t plugin_collect(collection_result_t* results) {
         sizeof(measurement_value_t) * disk_count);
     measurement_value_t* write_values = (measurement_value_t*)malloc(
         sizeof(measurement_value_t) * disk_count);
+    measurement_value_t* queue_values = (measurement_value_t*)malloc(
+        sizeof(measurement_value_t) * disk_count);
     
     // Collect values for each disk
     for (int i = 0; i < disk_count; i++) {
-        PDH_FMT_COUNTERVALUE read_value, write_value;
+        PDH_FMT_COUNTERVALUE read_value, write_value, queue_value;
         
         // Get read counter value
         status = PdhGetFormattedCounterValue(
@@ -238,6 +271,24 @@ PLUGIN_EXPORT size_t plugin_collect(collection_result_t* results) {
             write_values[i].value = 0.0;
             write_values[i].str_value = NULL;
         }
+        
+        // Get queue length counter value
+        status = PdhGetFormattedCounterValue(
+            disk_counters[i].queue_counter, PDH_FMT_DOUBLE, NULL, &queue_value);
+        
+        if (status == ERROR_SUCCESS) {
+            // Allocate source_id string (caller will free)
+            char* source_id = (char*)malloc(16);
+            snprintf(source_id, 16, "%d", disk_counters[i].disk_num);
+            
+            queue_values[i].source_id = source_id;
+            queue_values[i].value = queue_value.doubleValue;
+            queue_values[i].str_value = NULL;
+        } else {
+            queue_values[i].source_id = NULL;
+            queue_values[i].value = 0.0;
+            queue_values[i].str_value = NULL;
+        }
     }
     
     // Fill results
@@ -251,7 +302,12 @@ PLUGIN_EXPORT size_t plugin_collect(collection_result_t* results) {
     results[1].value_count = disk_count;
     results[1].values = write_values;
     
-    return 2;
+    results[2].key = "disk.queue.length";
+    results[2].status = COLLECT_OK;
+    results[2].value_count = disk_count;
+    results[2].values = queue_values;
+    
+    return 3;
 }
 
 /**
