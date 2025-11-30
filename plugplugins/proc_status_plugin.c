@@ -11,24 +11,47 @@
  *   gcc -shared -o proc_status_plugin.dll proc_status_plugin.c -ladvapi32 -Wall -O2
  *
  * DEPLOYMENT:
- *   1. Copy proc_status_plugin.dll to C:\Zabbix\plugins\measurements\
- *   2. Add to aggplugin.conf:
- *      [plugin.proc_status]
- *      enabled=1
- *      # Optional performance filters (comma-separated, limits what plugin collects):
- *      process_filter=notepad.exe,chrome.exe,explorer.exe,zabbix_agent2.exe
- *      service_filter=Zabbix Agent 2,Windows Update,Print Spooler
+ *   1. Copy proc_status_plugin.dll to C:\Zabbix\bin\plugins\
+ *   2. Restart Zabbix Agent 2 service
  *
  * METRICS EXPOSED:
- *   - proc.running[source_filter,aggregation,period] - Process running status
- *   - service.status[source_filter,aggregation,period] - Service status
+ *   - proc.running[<source>,<agg>,<window>]   - Process running status
+ *   - service.status[<source>,<agg>,<window>] - Service status
  *
- * ZABBIX ITEM KEY EXAMPLES:
- *   aggplugin.proc.running[notepad,last,0]              # Single process
- *   aggplugin.proc.running[notepad;chrome;explorer,last,0]  # Multiple (semicolon-separated)
- *   aggplugin.proc.running[*,avg,60]                    # All processes
- *   aggplugin.service.status[zabbix;agent,last,0]       # Services containing "zabbix" OR "agent"
- *   aggplugin.service.status[Zabbix Agent 2,last,0]     # Exact service display name match
+ * PARAMETERS:
+ *   All metrics accept three parameters (all optional, can use empty brackets []):
+ *   
+ *   [<source>,<agg>,<window>]
+ *   
+ *   1. <source> - Source filter (string, semicolon-separated for multiple)
+ *      - Process name substring (e.g., "notepad", "chrome", "explorer")
+ *      - Service name substring (e.g., "zabbix", "agent", "Print Spooler")
+ *      - Multiple filters: Semicolon-separated (e.g., "notepad;chrome;firefox")
+ *      - Special values: "*" or "all" or empty = return ALL processes/services
+ *      - Matching: Case-insensitive substring match on name OR full path
+ *      - Examples: "notepad", "zabbix;agent", "*", ""
+ *   
+ *   2. <agg> - Aggregation function (string)
+ *      - "last"   - Most recent value (default) - best for status checks
+ *      - "avg"    - Average of all values in time window
+ *      - "min"    - Minimum value (0 if stopped at any point)
+ *      - "max"    - Maximum value (1 if running at any point)
+ *      - "sum"    - Sum of all values
+ *      - "count"  - Number of samples collected
+ *      - Examples: "last", "avg", "max"
+ *   
+ *   3. <window> - Time window in seconds (number)
+ *      - "0" or empty: Use default collection window (typically 60-300 seconds)
+ *      - Positive number: Use specific time window (e.g., "60", "300", "3600")
+ *      - Examples: "0", "60", "300"
+ *   
+ *   USAGE EXAMPLES:
+ *   - aggplugin.proc.running[]                       - All processes, last value, default window
+ *   - aggplugin.proc.running[notepad,last,0]         - Process "notepad", last value
+ *   - aggplugin.proc.running[notepad;chrome,last,0]  - Multiple processes (OR logic)
+ *   - aggplugin.proc.running[zabbix,avg,300]         - Processes matching "zabbix", 5-min avg
+ *   - aggplugin.service.status[Zabbix Agent 2,last,0] - Specific service by display name
+ *   - aggplugin.service.status[*,last,0]             - All services, last value
  *
  * SOURCE_ID FORMAT:
  *   "friendly_name|full_path"
@@ -36,27 +59,27 @@
  *   - Process: "notepad.exe|C:\Windows\System32\notepad.exe"
  *   - Service: "Zabbix Agent 2|C:\zabbix\bin\zabbix_agent2.exe"
  *
- * FILTERING:
- *   - Config filter (optional): Limits what plugin collects (performance optimization)
+ * FILTERING LOGIC:
  *   - Query filter: Semicolon-separated terms, case-insensitive substring match
  *   - Matches either friendly name OR full path
- *   - "*" or "all" = return all collected items
+ *   - Multiple terms use OR logic (any match returns the source)
+ *   - "*" or "all" or empty = return all collected items
+ *   - Example: "zabbix;agent" matches "Zabbix Agent 2" OR any path containing "agent"
  *
  * RETURN VALUES:
  *   - 1 = Running/Active
  *   - 0 = Stopped/Not running
- *   - -1 = Error state (service pending, etc.)
+ *   - -1 = Error state (service pending, paused, etc.)
  *
  * NOTES:
  *   - Uses Windows Toolhelp32 API for process enumeration
  *   - Uses Windows Service Control Manager API for service status
- *   - Config filter is WHITELIST: only specified processes/services are collected
- *   - If no config filters specified, collects ALL processes/services (can be many!)
- *   - Query-time filtering via Zabbix item key (semicolon-separated)
+ *   - Collects ALL processes/services by default (can enumerate many items!)
+ *   - Query-time filtering via Zabbix item key parameter 1 (semicolon-separated)
  *   - Filtering is case-insensitive substring match on name OR path
  */
 
-#include "measurement_plugin_api.h"
+#include "../cpp_common/measurement_plugin_api.h"
 #include <windows.h>
 #include <tlhelp32.h>
 #include <psapi.h>
@@ -498,4 +521,3 @@ PLUGIN_EXPORT int plugin_deinit() {
     memset(&config, 0, sizeof(config));
     return 0;
 }
-
