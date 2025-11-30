@@ -137,6 +137,34 @@ extern "C" int collector_register_metric(const char *name, double multiplicator)
 extern "C" int collector_set_max_samples(const char *name, unsigned max_samples);
 
 /*
+ * collector_set_output_format - Set JSON output format (array vs nested object)
+ *
+ * PARAMETERS:
+ *   format: Output format selector:
+ *           0 = array format (default, Zabbix-compatible)
+ *               Returns: [{"source":"_all","avg":...},{"source":"C:",...}]
+ *           1 = nestedJSON format (legacy)
+ *               Returns: {"metric":"...","values":{"all":{...},"sources":{...}}}
+ *
+ * BEHAVIOR:
+ *   - Sets global output format for all subsequent collector_fetch_and_reset_json calls
+ *   - Default is 0 (array format) if never called
+ *   - Takes effect immediately for next fetch
+ *
+ * RETURN VALUE:
+ *   0 on success
+ *   1 if format is invalid (not 0 or 1)
+ *
+ * THREAD SAFETY: Safe to call from multiple threads (uses mutex)
+ *
+ * CALLED BY: main.go main() after loadConfig()
+ *
+ * ERRORS:
+ *   Returns 1 if format is not 0 or 1. No logging performed.
+ */
+extern "C" int collector_set_output_format(int format);
+
+/*
  * collector_fetch_and_reset_json - Fetch aggregated statistics and reset accumulator
  *
  * PARAMETERS:

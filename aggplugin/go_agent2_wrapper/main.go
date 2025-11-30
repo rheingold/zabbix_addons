@@ -106,6 +106,7 @@ extern void collector_init(double base_interval_seconds);
 extern void collector_stop(void);
 extern int collector_register_metric(const char *name, double multiplicator);
 extern int collector_set_max_samples(const char *name, unsigned max_samples);
+extern int collector_set_output_format(int format);
 extern int collector_fetch_and_reset_json(const char *name, char *result, unsigned result_len);
 
 // Plugin registry functions from plugin_loader.hpp
@@ -159,13 +160,14 @@ const (
 )
 
 // Global configuration variables (loaded from config files in order: plugin config > agent config > defaults)
-// Defaults: DebugLevel=0 (errors only), MaxSamples=1000, PreloadMetrics="cpu_load,mem_free", PreloadDelay=0
+// Defaults: DebugLevel=0 (errors only), MaxSamples=1000, PreloadMetrics="cpu_load,mem_free", PreloadDelay=0, OutputFormat="array"
 var cfgDebugLevel = 0                       // 0=None/Fatal, 1=Error, 2=Warning, 3=Info, 4=Verbose, 5=VeryVerbose
 var cfgMaxSamples = 1000                    // Maximum samples per metric before auto-reset
 var cfgPreloadMetrics = "cpu_load,mem_free" // Comma-separated list of metrics to preload on startup
 var cfgPreloadDelay = 0.0                   // Seconds to wait for baseline (0 = no delay, immediate availability)
 var cfgPluginPath = ""                      // Path pattern for measurement plugin DLLs (e.g., C:\Zabbix\plugins\*.dll)
 var cfgDLLMetrics = make(map[string]string) // Map of [dllname.dll] → comma-separated metric keys
+var cfgOutputFormat = "array"               // Output format: "array" (default, Zabbix-compatible) or "nestedJSON" (legacy)
 
 // ========================================================================
 // MEASUREMENT PLUGIN LOADER
@@ -740,6 +742,14 @@ func loadConfig() {
 			case "Plugins.Aggplugin.PluginPath":
 				cfgPluginPath = value
 				debugLog(DBG_INFO, fmt.Sprintf("Config: PluginPath=%s (from %s)", value, configPath))
+
+			case "Plugins.Aggplugin.OutputFormat":
+				if value == "array" || value == "nestedJSON" {
+					cfgOutputFormat = value
+					debugLog(DBG_INFO, fmt.Sprintf("Config: OutputFormat=%s (from %s)", value, configPath))
+				} else {
+					debugLog(DBG_WARNING, fmt.Sprintf("Config: Invalid OutputFormat=%s (must be 'array' or 'nestedJSON'), using default 'array'", value))
+				}
 			}
 		}
 
@@ -772,12 +782,20 @@ func main() {
 
 	// Load configuration from config files
 	loadConfig()
-	debugLog(DBG_INFO, fmt.Sprintf("Configuration loaded: DebugLevel=%d, MaxSamples=%d, PreloadMetrics=%s, PreloadDelay=%.1f",
-		cfgDebugLevel, cfgMaxSamples, cfgPreloadMetrics, cfgPreloadDelay))
+	debugLog(DBG_INFO, fmt.Sprintf("Configuration loaded: DebugLevel=%d, MaxSamples=%d, PreloadMetrics=%s, PreloadDelay=%.1f, OutputFormat=%s",
+		cfgDebugLevel, cfgMaxSamples, cfgPreloadMetrics, cfgPreloadDelay, cfgOutputFormat))
 
 	// Initialize C++ collector with 1-second sampling interval
 	debugLog(DBG_INFO, "Initializing C++ collector (1 second interval)...")
 	C.collector_init(C.double(1.0))
+
+	// Set output format (0=array [default], 1=nestedJSON [legacy])
+	formatValue := 0 // array
+	if cfgOutputFormat == "nestedJSON" {
+		formatValue = 1
+	}
+	C.collector_set_output_format(C.int(formatValue))
+	debugLog(DBG_INFO, fmt.Sprintf("Output format set to: %s (format=%d)", cfgOutputFormat, formatValue))
 	debugLog(DBG_INFO, "Collector initialized")
 
 	// Load measurement plugins from DLLs

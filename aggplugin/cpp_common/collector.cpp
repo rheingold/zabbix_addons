@@ -367,6 +367,20 @@ static std::mutex metrics_m;
 static std::atomic<bool> running(false);
 
 /*
+ * output_format - Global output format selector
+ * TYPE: std::atomic<int>
+ * VALUES:
+ *   0 = array format (default, Zabbix-compatible): [{"source":"_all","avg":...},{"source":"C:",...}]
+ *   1 = nestedJSON format (legacy): {"metric":"...","values":{"all":{...},"sources":{...}}}
+ * USAGE:
+ *   - Set by collector_set_output_format()
+ *   - Read by collector_fetch_and_reset_json()
+ * DEFAULT: 0 (array format)
+ * THREAD SAFETY: Atomic operations (no mutex needed)
+ */
+static std::atomic<int> output_format(0);  // Default: array format
+
+/*
  * worker - Background sampling thread
  * TYPE: std::thread
  * LIFECYCLE:
@@ -582,6 +596,27 @@ extern "C" int collector_set_max_samples(const char *name, unsigned max_samples)
 }
 
 /*
+ * collector_set_output_format - Implementation (see collector.hpp for full docs)
+ *
+ * PARAMETERS:
+ *   format: 0=array (default), 1=nestedJSON (legacy)
+ *
+ * IMPLEMENTATION DETAILS:
+ *   - Validates format is 0 or 1
+ *   - Sets global atomic output_format variable
+ *   - Takes effect immediately for all subsequent fetch calls
+ *
+ * RETURN: 0=success, 1=invalid format
+ *
+ * CALLED BY: main.go main() after loadConfig()
+ */
+extern "C" int collector_set_output_format(int format) {
+    if (format != 0 && format != 1) return 1;
+    output_format.store(format);
+    return 0;
+}
+
+/*
  * collector_fetch_and_reset_json - Implementation (see collector.hpp for full docs)
  *
  * PARAMETERS:
@@ -595,11 +630,20 @@ extern "C" int collector_set_max_samples(const char *name, unsigned max_samples)
  *   - Looks up metric in map
  *   - If not found: returns 1 (error)
  *   - If found:
- *     * Determines if per-core data needed (cpu_load metric)
- *     * Calls acc.fetch_and_reset_json() to get JSON string
+ *     * Checks global output_format (0=array, 1=nestedJSON)
+ *     * Computes statistics across all sources
+ *     * Generates JSON in selected format
  *     * Copies JSON to result buffer (truncates if too large)
  *     * Ensures null-termination
  *     * Returns 0 (success)
+ *
+ * OUTPUT FORMATS:
+ *   Array format (format=0, default):
+ *     [{"source":"_all","avg":45.2,"min":12.3,"max":89.7,"med":43.1,"mod":45,"dev":15.6,"var":243.4,"cnt":120,"last":45.0},
+ *      {"source":"C:","avg":42.1,"min":10.0,"max":88.5,"med":40.2,"mod":42,"dev":14.3,"var":204.5,"cnt":60,"last":42.5}]
+ *
+ *   NestedJSON format (format=1, legacy):
+ *     {"metric":"cpu_load","values":{"all":{...},"sources":{"C:":{...}}}}
  *
  * RETURN: 0=success, 1=name is NULL, result is NULL, or metric not registered
  *
@@ -617,16 +661,26 @@ extern "C" int collector_fetch_and_reset_json(const char *name, char *result, un
     auto it = metrics.find(s);
     if (it == metrics.end()) return 1; // Metric not found
     
+    int current_format = output_format.load();
     std::ostringstream o;
     o.precision(6);
-    o << "{\"metric\":\"" << s << "\",\"values\":{";
     
     // Calculate aggregate "all" statistics across all sources
     uint64_t total_count = 0;
     double total_sum = 0.0;
     double global_min = std::numeric_limits<double>::infinity();
     double global_max = -std::numeric_limits<double>::infinity();
+    double last_value = 0.0;
     std::vector<double> all_values;
+    
+    // Collect per-source stats for array format
+    struct SourceStats {
+        std::string source_id;
+        double avg, min, max, med, dev, var, last;
+        int mode_val;
+        uint64_t cnt;
+    };
+    std::vector<SourceStats> source_stats_list;
     
     for (auto& source_pair : it->second.source_accumulators) {
         Accumulator& acc = source_pair.second;
@@ -636,90 +690,187 @@ extern "C" int collector_fetch_and_reset_json(const char *name, char *result, un
         total_sum += acc.sum;
         if (acc.min < global_min) global_min = acc.min;
         if (acc.max > global_max) global_max = acc.max;
+        if (!acc.values.empty()) last_value = acc.values.back();
         all_values.insert(all_values.end(), acc.values.begin(), acc.values.end());
+        
+        // Calculate per-source stats for array format
+        if (current_format == 0 && acc.count > 0) {
+            SourceStats ss;
+            ss.source_id = source_pair.first.empty() ? "default" : source_pair.first;
+            ss.avg = acc.sum / (double)acc.count;
+            ss.min = acc.min;
+            ss.max = acc.max;
+            ss.cnt = acc.count;
+            ss.last = acc.values.empty() ? 0.0 : acc.values.back();
+            
+            // Median for this source
+            std::vector<double> sorted_vals = acc.values;
+            std::sort(sorted_vals.begin(), sorted_vals.end());
+            if (sorted_vals.size() % 2 == 0) {
+                ss.med = (sorted_vals[sorted_vals.size()/2 - 1] + sorted_vals[sorted_vals.size()/2]) / 2.0;
+            } else {
+                ss.med = sorted_vals[sorted_vals.size()/2];
+            }
+            
+            // Mode for this source
+            std::unordered_map<int, uint64_t> freq_map;
+            double sum_sq = 0.0;
+            for (double v : acc.values) {
+                freq_map[(int)std::llround(v)]++;
+                sum_sq += v * v;
+            }
+            ss.mode_val = 0;
+            uint64_t mode_count = 0;
+            for (auto &p : freq_map) {
+                if (p.second > mode_count) {
+                    mode_count = p.second;
+                    ss.mode_val = p.first;
+                }
+            }
+            
+            // Variance and stddev for this source
+            ss.var = (sum_sq / (double)acc.count) - (ss.avg * ss.avg);
+            ss.dev = std::sqrt(ss.var);
+            
+            source_stats_list.push_back(ss);
+        }
     }
     
-    // Generate "all" aggregate stats
-    o << "\"all\":{";
-    if (total_count == 0) {
-        o << "\"avg\":null,\"min\":null,\"max\":null,\"med\":null,\"mod\":null,\"dev\":null,\"var\":null,\"cnt\":0";
-    } else {
-        double avg = total_sum / (double)total_count;
-        
-        // Compute median from all values
+    // Calculate aggregate statistics
+    double global_avg = total_count > 0 ? total_sum / (double)total_count : 0.0;
+    double global_median = 0.0;
+    int global_mode = 0;
+    double global_var = 0.0;
+    double global_dev = 0.0;
+    
+    if (total_count > 0) {
+        // Global median
         std::sort(all_values.begin(), all_values.end());
-        double median;
         if (all_values.size() % 2 == 0) {
-            median = (all_values[all_values.size()/2 - 1] + all_values[all_values.size()/2]) / 2.0;
+            global_median = (all_values[all_values.size()/2 - 1] + all_values[all_values.size()/2]) / 2.0;
         } else {
-            median = all_values[all_values.size()/2];
+            global_median = all_values[all_values.size()/2];
         }
         
-        // Compute mode
+        // Global mode
         std::unordered_map<int, uint64_t> freq_map;
         double sum_sq = 0.0;
         for (double v : all_values) {
             freq_map[(int)std::llround(v)]++;
             sum_sq += v * v;
         }
-        int mode_val = 0;
         uint64_t mode_count = 0;
         for (auto &p : freq_map) {
             if (p.second > mode_count) {
                 mode_count = p.second;
-                mode_val = p.first;
+                global_mode = p.first;
             }
         }
         
-        // Compute variance and stddev
-        double variance = (sum_sq / (double)total_count) - (avg * avg);
-        double stddev = std::sqrt(variance);
-        
-        o << "\"avg\":" << avg << ",";
-        o << "\"min\":" << global_min << ",";
-        o << "\"max\":" << global_max << ",";
-        o << "\"med\":" << median << ",";
-        o << "\"mod\":" << mode_val << ",";
-        o << "\"dev\":" << stddev << ",";
-        o << "\"var\":" << variance << ",";
-        o << "\"cnt\":" << total_count;
+        // Global variance and stddev
+        global_var = (sum_sq / (double)total_count) - (global_avg * global_avg);
+        global_dev = std::sqrt(global_var);
     }
-    o << "}";
     
-    // Add per-source statistics if multi-source
-    if (it->second.source_accumulators.size() > 1 || 
-        (it->second.source_accumulators.size() == 1 && !it->second.source_accumulators.begin()->first.empty())) {
-        o << ",\"sources\":{";
-        bool first_source = true;
+    // ========== FORMAT GENERATION ==========
+    
+    if (current_format == 0) {
+        // ARRAY FORMAT (default, Zabbix-compatible)
+        o << "[";
         
-        for (auto& source_pair : it->second.source_accumulators) {
-            if (!first_source) o << ",";
-            first_source = false;
-            
-            std::string source_id = source_pair.first.empty() ? "default" : source_pair.first;
-            o << "\"" << source_id << "\":";
-            
-            // Get stats for this source (without per-core flag)
-            std::string source_json = source_pair.second.fetch_and_reset_json(s, false);
-            
-            // Extract just the "all" stats part from source JSON
-            size_t values_pos = source_json.find("\"values\":{\"all\":");
-            if (values_pos != std::string::npos) {
-                size_t all_start = source_json.find("{", values_pos + 15);
-                size_t all_end = source_json.find("}", all_start);
-                if (all_start != std::string::npos && all_end != std::string::npos) {
-                    o << source_json.substr(all_start, all_end - all_start + 1);
-                } else {
-                    o << "{}";
-                }
-            } else {
-                o << "{}";
-            }
+        // First entry: aggregate "_all" stats
+        o << "{\"source\":\"_all\",";
+        if (total_count == 0) {
+            o << "\"avg\":null,\"min\":null,\"max\":null,\"med\":null,\"mod\":null,\"dev\":null,\"var\":null,\"cnt\":0,\"last\":null";
+        } else {
+            o << "\"avg\":" << global_avg << ",";
+            o << "\"min\":" << global_min << ",";
+            o << "\"max\":" << global_max << ",";
+            o << "\"med\":" << global_median << ",";
+            o << "\"mod\":" << global_mode << ",";
+            o << "\"dev\":" << global_dev << ",";
+            o << "\"var\":" << global_var << ",";
+            o << "\"cnt\":" << total_count << ",";
+            o << "\"last\":" << last_value;
         }
         o << "}";
+        
+        // Per-source entries (if multi-source metric)
+        for (const auto& ss : source_stats_list) {
+            o << ",{\"source\":\"" << ss.source_id << "\",";
+            o << "\"avg\":" << ss.avg << ",";
+            o << "\"min\":" << ss.min << ",";
+            o << "\"max\":" << ss.max << ",";
+            o << "\"med\":" << ss.med << ",";
+            o << "\"mod\":" << ss.mode_val << ",";
+            o << "\"dev\":" << ss.dev << ",";
+            o << "\"var\":" << ss.var << ",";
+            o << "\"cnt\":" << ss.cnt << ",";
+            o << "\"last\":" << ss.last;
+            o << "}";
+        }
+        
+        o << "]";
+        
+    } else {
+        // NESTED JSON FORMAT (legacy)
+        o << "{\"metric\":\"" << s << "\",\"values\":{";
+        
+        // Generate "all" aggregate stats
+        o << "\"all\":{";
+        if (total_count == 0) {
+            o << "\"avg\":null,\"min\":null,\"max\":null,\"med\":null,\"mod\":null,\"dev\":null,\"var\":null,\"cnt\":0";
+        } else {
+            o << "\"avg\":" << global_avg << ",";
+            o << "\"min\":" << global_min << ",";
+            o << "\"max\":" << global_max << ",";
+            o << "\"med\":" << global_median << ",";
+            o << "\"mod\":" << global_mode << ",";
+            o << "\"dev\":" << global_dev << ",";
+            o << "\"var\":" << global_var << ",";
+            o << "\"cnt\":" << total_count;
+        }
+        o << "}";
+        
+        // Add per-source statistics if multi-source
+        if (it->second.source_accumulators.size() > 1 || 
+            (it->second.source_accumulators.size() == 1 && !it->second.source_accumulators.begin()->first.empty())) {
+            o << ",\"sources\":{";
+            bool first_source = true;
+            
+            for (const auto& ss : source_stats_list) {
+                if (!first_source) o << ",";
+                first_source = false;
+                
+                o << "\"" << ss.source_id << "\":{";
+                o << "\"avg\":" << ss.avg << ",";
+                o << "\"min\":" << ss.min << ",";
+                o << "\"max\":" << ss.max << ",";
+                o << "\"med\":" << ss.med << ",";
+                o << "\"mod\":" << ss.mode_val << ",";
+                o << "\"dev\":" << ss.dev << ",";
+                o << "\"var\":" << ss.var << ",";
+                o << "\"cnt\":" << ss.cnt;
+                o << "}";
+            }
+            o << "}";
+        }
+        
+        o << "}}";
     }
     
-    o << "}}";
+    // Reset all accumulators after generating JSON
+    for (auto& source_pair : it->second.source_accumulators) {
+        Accumulator& acc = source_pair.second;
+        std::lock_guard<std::mutex> acc_lock(acc.m);
+        acc.count = 0;
+        acc.sum = 0.0;
+        acc.sum_sq = 0.0;
+        acc.min = std::numeric_limits<double>::infinity();
+        acc.max = -std::numeric_limits<double>::infinity();
+        acc.values.clear();
+    }
+    
     std::string js = o.str();
     
     if (js.size() + 1 > result_len) {
