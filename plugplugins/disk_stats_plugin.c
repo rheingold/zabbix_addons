@@ -28,7 +28,7 @@
  *   - Source IDs are disk numbers (e.g., "0", "1", "2")
  */
 
-#include "../cpp_common/measurement_plugin_api.h"
+#include "measurement_plugin_api.h"
 #include <windows.h>
 #include <pdh.h>
 #include <stdio.h>
@@ -330,3 +330,4 @@ PLUGIN_EXPORT int plugin_deinit() {
 // plugin_on_reset - Not needed (no stateful counters)
 // plugin_aggregate_custom - Not needed (default aggregation is fine)
 // plugin_on_init_complete - Not needed (no cross-plugin coordination)
+

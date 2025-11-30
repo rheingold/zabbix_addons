@@ -56,7 +56,7 @@
  *   - Filtering is case-insensitive substring match on name OR path
  */
 
-#include "../cpp_common/measurement_plugin_api.h"
+#include "measurement_plugin_api.h"
 #include <windows.h>
 #include <tlhelp32.h>
 #include <psapi.h>
@@ -498,3 +498,4 @@ PLUGIN_EXPORT int plugin_deinit() {
     memset(&config, 0, sizeof(config));
     return 0;
 }
+

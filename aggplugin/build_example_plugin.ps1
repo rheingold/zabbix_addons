@@ -79,16 +79,40 @@ foreach ($plugin in $pluginsToBuild) {
     Write-Host "  Source:  $sourceFile" -ForegroundColor Gray
     Write-Host "  Output:  $outputFile" -ForegroundColor Gray
 
+    # Auto-detect required libraries by scanning source file
+    $sourceContent = Get-Content $sourceFile -Raw
+    $libraries = @()
+    
+    if ($sourceContent -match '#include\s+<pdh\.h>') {
+        $libraries += "-lPdh"
+    }
+    if ($sourceContent -match '#include\s+<psapi\.h>') {
+        $libraries += "-lpsapi"
+    }
+    if ($sourceContent -match 'OpenSCManager|OpenService|QueryServiceConfig') {
+        $libraries += "-ladvapi32"
+    }
+
     # Compiler flags
     $compilerFlags = @(
         "-shared",              # Build DLL
         "-o", $outputFile,      # Output file
-        $sourceFile,            # Source file
-        "-lPdh",                # Link PDH library (Performance Data Helper)
+        $sourceFile             # Source file
+    )
+    
+    # Add detected libraries
+    $compilerFlags += $libraries
+    
+    # Add standard flags
+    $compilerFlags += @(
         "-Wall",                # Enable all warnings
         "-O2",                  # Optimize for speed
         "-std=c11"              # C11 standard
     )
+    
+    if ($libraries.Count -gt 0) {
+        Write-Host "  Libraries: $($libraries -join ', ')" -ForegroundColor Gray
+    }
 
     Write-Host "  Compiling..." -ForegroundColor Yellow
 
