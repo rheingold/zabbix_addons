@@ -35,6 +35,7 @@
  * METRICS PROVIDED:
  *   - Dynamically loaded from DLL plugins via Plugins.Aggplugin.PluginPath
  *   - Example plugins: cpu_load, mem_free, disk.io.read[*], disk.io.write[*], disk.queue.length[*]
+ *   - Process/Service monitoring: proc.running[name|path], service.status[name|path]
  *
  * CONFIGURATION FILE:
  *   Location: C:\zabbix\conf\zabbix_agent2.d\plugins.d\aggplugin.conf

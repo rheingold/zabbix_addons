@@ -111,6 +111,10 @@ Plugin-based (DLL):- Thread-safe: Plugin collection runs in background thread
 
 - aggplugin.disk.queue.length - Avg disk queue length (disk_stats_plugin.dll, multi-source per disk)
 
+- aggplugin.proc.running - Process running status (proc_status_plugin.dll, multi-source per process)
+
+- aggplugin.service.status - Windows service status (proc_status_plugin.dll, multi-source per service)
+
 KEY TECHNICAL DETAILS:
 
 - Sampling: Background thread samples metrics every 1 second
