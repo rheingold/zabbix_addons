@@ -126,12 +126,13 @@ if (Test-Path "example_plugins") {
         
         if (Test-Path $sourceFile) {
             Write-Host "Building $plugin.dll..."
-            g++ -shared -o $outputFile $sourceFile `
+            # Use gcc instead of g++ for C plugins to ensure proper symbol exports
+            gcc -shared -o $outputFile $sourceFile `
                 -I"cpp_common" `
                 -I"..\zabbixlib\include" `
                 -lpdh `
                 -static-libgcc `
-                -static-libstdc++
+                -Wl,--export-all-symbols
             
             if ($LASTEXITCODE -eq 0) {
                 Write-Host "Created $outputFile" -ForegroundColor Green

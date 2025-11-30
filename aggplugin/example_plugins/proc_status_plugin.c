@@ -339,10 +339,10 @@ static int collect_processes(measurement_value_t** out_values) {
                     strncpy(path, "(unavailable)", sizeof(path) - 1);
                 }
                 
-                // Format: "process_name.exe|C:\full\path\to\process.exe"
-                char* source_id = (char*)malloc(MAX_PATH_LEN + MAX_NAME_LEN);
-                snprintf(source_id, MAX_PATH_LEN + MAX_NAME_LEN, "%s|%s", 
-                        pe32.szExeFile, path);
+                // Use only process name (without path) to keep source_id stable
+                // This prevents memory explosion from unique PIDs/paths
+                char* source_id = (char*)malloc(MAX_NAME_LEN);
+                snprintf(source_id, MAX_NAME_LEN, "%s", pe32.szExeFile);
                 
                 values[idx].source_id = source_id;
                 values[idx].value = 1.0;  // Running
@@ -446,10 +446,10 @@ static int collect_services(measurement_value_t** out_values) {
                 CloseServiceHandle(hService);
             }
             
-            // Format: "Display Name|C:\path\to\service.exe"
-            char* source_id = (char*)malloc(MAX_PATH_LEN + MAX_NAME_LEN);
-            snprintf(source_id, MAX_PATH_LEN + MAX_NAME_LEN, "%s|%s", 
-                    services[i].lpDisplayName, path);
+            // Use only service display name (without path) to keep source_id stable
+            // This prevents memory explosion from varying service PIDs/paths
+            char* source_id = (char*)malloc(MAX_NAME_LEN);
+            snprintf(source_id, MAX_NAME_LEN, "%s", services[i].lpDisplayName);
             
             values[idx].source_id = source_id;
             

@@ -72,7 +72,8 @@ extern "C" {
     DLL_EXPORT void collector_stop(void);
     DLL_EXPORT int collector_register_metric(const char *name, double multiplicator);
     DLL_EXPORT int collector_set_max_samples(const char *name, unsigned max_samples);
-    DLL_EXPORT int collector_fetch_and_reset_json(const char *name, char *result, unsigned result_len);
+    DLL_EXPORT int collector_set_output_format(int format);
+    DLL_EXPORT int collector_fetch_and_reset_json(const char *name, char *result, unsigned result_len, const char *filter);
 }
 
 // No implementation code here - all logic is in collector.cpp

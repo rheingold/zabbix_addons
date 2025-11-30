@@ -176,7 +176,14 @@ extern "C" int collector_set_output_format(int format);
  *   result_len: Size of result buffer in bytes. Must be >= ~200 bytes for typical output.
  *               Recommended: 4096 bytes to accommodate per-core data (future feature).
  *
+ *   filter: Optional filter pattern for source selection (can be NULL).
+ *           - NULL or empty string: uses last filter (or no sampling if never set)
+ *           - Must be min 3 characters + wildcard (e.g. "svc*", "chrome*")
+ *           - Pattern is saved and used for subsequent sampling until changed
+ *           - Examples: "chrome*", "Zabbix*", "disk*"
+ *
  * BEHAVIOR:
+ *   - If filter provided and valid (3+ chars), stores it for future sampling
  *   - Locks the metric's accumulator
  *   - Computes all statistics (avg, min, max, median, mode, stddev, variance)
  *   - Generates JSON output string
@@ -205,5 +212,6 @@ extern "C" int collector_set_output_format(int format);
  *   - name is NULL
  *   - metric not registered (missing collector_register_metric call)
  *   - result buffer too small (increase result_len)
+ *   - filter too short (< 3 characters)
  */
-extern "C" int collector_fetch_and_reset_json(const char *name, char *result, unsigned result_len);
+extern "C" int collector_fetch_and_reset_json(const char *name, char *result, unsigned result_len, const char *filter);

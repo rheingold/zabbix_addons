@@ -45,6 +45,10 @@
  *   - Plugins.Aggplugin.MaxSamples (optional): Auto-reset threshold, default 1000
  *   - Plugins.Aggplugin.PreloadMetrics (optional): Metrics to preload, default "cpu_load,mem_free"
  *   - Plugins.Aggplugin.PreloadDelay (optional): Baseline delay in seconds, default 0
+ *   - Plugins.Aggplugin.OutputFormat (optional): "array" or "nestedJSON", default "array"
+ *   - Plugins.Aggplugin.IntervalCPU (optional): CPU/Memory sampling interval in seconds, default 1.0
+ *   - Plugins.Aggplugin.IntervalDisk (optional): Disk I/O sampling interval in seconds, default 5.0
+ *   - Plugins.Aggplugin.IntervalService (optional): Service/Process sampling interval in seconds, default 20.0
  *
  * CRITICAL SDK DEPENDENCY:
  *   MUST use golang.zabbix.com/sdk v1.2.2-0.20251007063238-42702926b56d or newer
@@ -107,7 +111,7 @@ extern void collector_stop(void);
 extern int collector_register_metric(const char *name, double multiplicator);
 extern int collector_set_max_samples(const char *name, unsigned max_samples);
 extern int collector_set_output_format(int format);
-extern int collector_fetch_and_reset_json(const char *name, char *result, unsigned result_len);
+extern int collector_fetch_and_reset_json(const char *name, char *result, unsigned result_len, const char *filter);
 
 // Plugin registry functions from plugin_loader.hpp
 extern int register_measurement_plugin(const char* metric_key, void* dll_handle, void* collect_func, size_t key_index);
@@ -168,6 +172,9 @@ var cfgPreloadDelay = 0.0                   // Seconds to wait for baseline (0 =
 var cfgPluginPath = ""                      // Path pattern for measurement plugin DLLs (e.g., C:\Zabbix\plugins\*.dll)
 var cfgDLLMetrics = make(map[string]string) // Map of [dllname.dll] → comma-separated metric keys
 var cfgOutputFormat = "array"               // Output format: "array" (default, Zabbix-compatible) or "nestedJSON" (legacy)
+var cfgIntervalCPU = 1.0                    // Sampling interval for CPU/Memory metrics in seconds (default: 1.0)
+var cfgIntervalDisk = 5.0                   // Sampling interval for Disk I/O metrics in seconds (default: 5.0)
+var cfgIntervalService = 20.0               // Sampling interval for Service/Process metrics in seconds (default: 20.0)
 
 // ========================================================================
 // MEASUREMENT PLUGIN LOADER
@@ -443,13 +450,27 @@ func (p *Plugin) Export(key string, params []string, context plugin.ContextProvi
 	metricName := strings.TrimPrefix(key, "aggplugin.")
 
 	// Fetch aggregated data from collector
-	debugLog(DBG_VERBOSE, fmt.Sprintf("Fetching aggregated data for metric: %s", metricName))
+	debugLog(DBG_VERBOSE, fmt.Sprintf("Fetching aggregated data for metric: %s, params: %v", metricName, params))
 
 	cMetricName := C.CString(metricName)
 	defer C.free(unsafe.Pointer(cMetricName))
 
+	// Extract filter parameter (first param, optional)
+	var cFilter *C.char
+	if len(params) > 0 && len(params[0]) >= 3 {
+		cFilter = C.CString(params[0])
+		defer C.free(unsafe.Pointer(cFilter))
+		debugLog(DBG_VERBOSE, fmt.Sprintf("Using filter for %s: '%s'", metricName, params[0]))
+	} else {
+		// Default to wildcard "***" for metrics without parameters
+		// This ensures non-parametrized metrics work without explicit filter
+		cFilter = C.CString("***")
+		defer C.free(unsafe.Pointer(cFilter))
+		debugLog(DBG_VERBOSE, fmt.Sprintf("Using default wildcard filter for %s", metricName))
+	}
+
 	buffer := make([]byte, 4096)
-	ret := C.collector_fetch_and_reset_json(cMetricName, (*C.char)(unsafe.Pointer(&buffer[0])), C.uint(len(buffer)))
+	ret := C.collector_fetch_and_reset_json(cMetricName, (*C.char)(unsafe.Pointer(&buffer[0])), C.uint(len(buffer)), cFilter)
 
 	if ret != 0 {
 		debugLog(DBG_ERROR, fmt.Sprintf("collector_fetch_and_reset_json failed for %s: %d", metricName, ret))
@@ -750,6 +771,24 @@ func loadConfig() {
 				} else {
 					debugLog(DBG_WARNING, fmt.Sprintf("Config: Invalid OutputFormat=%s (must be 'array' or 'nestedJSON'), using default 'array'", value))
 				}
+
+			case "Plugins.Aggplugin.IntervalCPU":
+				if interval, err := strconv.ParseFloat(value, 64); err == nil && interval > 0 {
+					cfgIntervalCPU = interval
+					debugLog(DBG_INFO, fmt.Sprintf("Config: IntervalCPU=%.1fs (from %s)", interval, configPath))
+				}
+
+			case "Plugins.Aggplugin.IntervalDisk":
+				if interval, err := strconv.ParseFloat(value, 64); err == nil && interval > 0 {
+					cfgIntervalDisk = interval
+					debugLog(DBG_INFO, fmt.Sprintf("Config: IntervalDisk=%.1fs (from %s)", interval, configPath))
+				}
+
+			case "Plugins.Aggplugin.IntervalService":
+				if interval, err := strconv.ParseFloat(value, 64); err == nil && interval > 0 {
+					cfgIntervalService = interval
+					debugLog(DBG_INFO, fmt.Sprintf("Config: IntervalService=%.1fs (from %s)", interval, configPath))
+				}
 			}
 		}
 
@@ -803,17 +842,40 @@ func main() {
 		debugLog(DBG_ERROR, fmt.Sprintf("Failed to load measurement plugins: %v", err))
 	}
 
-	// Register all metrics with collector
+	// Register all metrics with collector using appropriate sampling intervals
 	debugLog(DBG_INFO, fmt.Sprintf("Registering %d plugin(s) with collector...", len(loadedPlugins)))
+	debugLog(DBG_INFO, fmt.Sprintf("Sampling intervals: CPU/Memory=%.1fs, Disk=%.1fs, Service/Process=%.1fs",
+		cfgIntervalCPU, cfgIntervalDisk, cfgIntervalService))
 	for _, loadedPlugin := range loadedPlugins {
 		for _, keyInfo := range loadedPlugin.Info.Keys {
+			// Determine sampling multiplicator based on metric type
+			var multiplicator float64 = cfgIntervalCPU
+
+			metricKey := keyInfo.Key
+
+			// Disk I/O metrics: use configured disk interval
+			if strings.HasPrefix(metricKey, "disk.io.") ||
+				strings.HasPrefix(metricKey, "vfs.") ||
+				strings.HasPrefix(metricKey, "storage.") {
+				multiplicator = cfgIntervalDisk
+				debugLog(DBG_VERBOSE, fmt.Sprintf("Metric %s: Disk I/O type, sampling every %.1f seconds", metricKey, multiplicator))
+				// Service/Process metrics: use configured service interval
+			} else if metricKey == "proc.running" || metricKey == "service.status" {
+				multiplicator = cfgIntervalService
+				debugLog(DBG_VERBOSE, fmt.Sprintf("Metric %s: Service/Process type, sampling every %.1f seconds", metricKey, multiplicator))
+				// CPU/Memory metrics: use configured CPU interval (default)
+			} else {
+				multiplicator = cfgIntervalCPU
+				debugLog(DBG_VERBOSE, fmt.Sprintf("Metric %s: CPU/Memory type, sampling every %.1f seconds", metricKey, multiplicator))
+			}
+
 			cName := C.CString(keyInfo.Key)
-			ret := C.collector_register_metric(cName, C.double(1.0))
+			ret := C.collector_register_metric(cName, C.double(multiplicator))
 			C.free(unsafe.Pointer(cName))
 			if ret != 0 {
 				debugLog(DBG_ERROR, fmt.Sprintf("Failed to register metric %s with collector", keyInfo.Key))
 			} else {
-				debugLog(DBG_VERBOSE, fmt.Sprintf("Registered metric with collector: %s", keyInfo.Key))
+				debugLog(DBG_VERBOSE, fmt.Sprintf("Registered metric: %s (interval: %.1fs)", keyInfo.Key, multiplicator))
 			}
 		}
 	}
@@ -832,19 +894,22 @@ func main() {
 	// INITIAL RESET: Clear any baseline/stale data from collector initialization
 	// This ensures fresh state and that first query gets clean data from time zero
 	// Only reset metrics specified in PreloadMetrics configuration (or all if empty)
+	// IMPORTANT: Pass wildcard filter "***" to initialize filter for non-parametrized metrics
 	if cfgPreloadMetrics != "" {
 		debugLog(DBG_VERBOSE, fmt.Sprintf("Performing initial collector reset for configured metrics: %s", cfgPreloadMetrics))
 		buffer := make([]byte, 4096)
 		metricsToReset := strings.Split(cfgPreloadMetrics, ",")
+		cFilter := C.CString("***") // Initialize filter for metrics without parameters
+		defer C.free(unsafe.Pointer(cFilter))
 		for _, metricName := range metricsToReset {
 			metricName = strings.TrimSpace(metricName)
 			if metricName == "" {
 				continue
 			}
 			cMetric := C.CString(metricName)
-			C.collector_fetch_and_reset_json(cMetric, (*C.char)(unsafe.Pointer(&buffer[0])), C.uint(len(buffer)))
+			C.collector_fetch_and_reset_json(cMetric, (*C.char)(unsafe.Pointer(&buffer[0])), C.uint(len(buffer)), cFilter)
 			C.free(unsafe.Pointer(cMetric))
-			debugLog(DBG_VVERBOSE, fmt.Sprintf("Reset metric: %s", metricName))
+			debugLog(DBG_VVERBOSE, fmt.Sprintf("Reset metric: %s (filter initialized)", metricName))
 		}
 		debugLog(DBG_VERBOSE, "Initial collector reset complete - configured metrics zeroed")
 	} else {

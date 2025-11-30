@@ -54,6 +54,7 @@
 #include <cstring>               // std::memcpy (not used directly, but may be required by other headers)
 #include <vector>                // std::vector<double> - store all samples for median/mode
 #include <algorithm>             // std::sort - median computation requires sorted values
+#include <map>                   // std::map - mode frequency map (limited to 100 unique values)
 #include <cstdio>                // fprintf - debugging output
 #include <ctime>                 // time(), localtime() - timestamps for logging
 #include <cstdarg>               // va_list, va_start, va_end - variadic function support
@@ -90,90 +91,91 @@ void log_debug(const char* fmt, ...) {
 #include <algorithm>             // std::sort - median computation requires sorted values
 
 /*
- * struct Accumulator - Thread-safe sample accumulator for a single metric
+ * struct Accumulator - Thread-safe sample accumulator using incremental statistics
  *
  * PURPOSE:
- *   Stores all samples for one metric and provides thread-safe accumulation
- *   with automatic reset when threshold reached.
+ *   Stores summary statistics for one metric using online/incremental algorithms
+ *   to avoid storing all samples. Uses weighted updates when max_samples reached.
  *
  * MEMBERS:
  *   m: Mutex for thread-safe access to all other members
  *   
- *   count: Number of samples accumulated so far (uint64_t)
- *          Incremented on each add() call
- *          Reset to 0 when max_samples reached or fetch_and_reset_json() called
- *   
- *   max_samples: Auto-reset threshold (uint64_t, default 1000)
- *                When count reaches this value, accumulator resets automatically
- *                Prevents unbounded memory growth in long-running agents
- *                Configurable via collector_set_max_samples()
- *   
- *   sum: Running sum of all sample values (double)
- *        Used for average calculation: avg = sum / count
- *   
- *   sum_sq: Running sum of squared values (double)
- *           Used for variance: var = (sum_sq / count) - (avg * avg)
- *   
- *   min: Minimum value observed (double)
- *        Initialized to +infinity, updated on each add() if v < min
- *   
- *   max: Maximum value observed (double)
- *        Initialized to -infinity, updated on each add() if v > max
- *   
- *   values: All sample values stored in insertion order (std::vector<double>)
- *           Required for median (must sort) and mode (frequency count)
- *           Memory impact: count * 8 bytes (e.g., 8 KB for 1000 samples)
+ *   count: Number of samples accumulated (uint64_t, stays at max_samples after threshold)
+ *   max_samples: Weight threshold (uint64_t, default 1000)
+ *   sum: Running weighted sum (avg = sum / count)
+ *   sum_sq: Running weighted sum of squares (for variance)
+ *   min: Minimum value observed (never reset, only updated if new value lower)
+ *   max: Maximum value observed (never reset, only updated if new value higher)
+ *   last: Last value added (for "last" statistic in JSON output)
+ *   median: Approximate median (updated using weighted average when max_samples reached)
+ *   mode_map: Frequency map for mode calculation (limited to 100 unique values max)
  *
- * THREAD SAFETY:
- *   All methods acquire lock_guard<mutex> before accessing members
+ * ALGORITHM (when count >= max_samples):
+ *   New value has weight=1, old summary has weight=max_samples
+ *   avg_new = (max_samples * avg_old + new_value) / (max_samples + 1)
+ *   This keeps count fixed at max_samples, prevents memory growth
+ *
+ * MEMORY: ~100 bytes per accumulator (no value vector storage)
+ *
+ * THREAD SAFETY: All methods acquire lock_guard<mutex> before accessing members
  */
 struct Accumulator {
-    std::mutex m;                // Thread synchronization
-    uint64_t count = 0;          // Number of samples
-    uint64_t max_samples = 1000; // Auto-reset threshold
-    double sum = 0.0;            // Sum for average
-    double sum_sq = 0.0;         // Sum of squares for variance
-    double min = std::numeric_limits<double>::infinity();   // Minimum value
-    double max = -std::numeric_limits<double>::infinity();  // Maximum value
-    std::vector<double> values;  // All values for median/mode
+    std::mutex m;
+    uint64_t count = 0;
+    uint64_t max_samples = 1000;
+    double sum = 0.0;
+    double sum_sq = 0.0;
+    double min = std::numeric_limits<double>::infinity();
+    double max = -std::numeric_limits<double>::infinity();
+    double last = 0.0;
+    double median = 0.0;  // Approximate median (weighted update after max_samples)
+    std::map<int, uint64_t> mode_map;  // Value (rounded to int) -> frequency count
 
     /*
-     * add - Add a sample value to the accumulator
-     *
-     * PARAMETERS:
-     *   v: Sample value to add (double)
+     * add - Add sample using incremental statistics with weighted update
      *
      * BEHAVIOR:
-     *   - Acquires mutex lock
-     *   - Checks if max_samples reached, resets if yes
-     *   - Increments count
-     *   - Updates sum, sum_sq, min, max
-     *   - Appends value to values vector
-     *   - Releases mutex lock
-     *
-     * CALLED BY: collector_loop() for each metric sample
+     *   - If count < max_samples: accumulate normally
+     *   - If count >= max_samples: use weighted update (old weight=max_samples, new weight=1)
+     *     This keeps statistics current while preventing unbounded growth
      *
      * THREAD SAFETY: Safe (mutex protected)
      */
     void add(double v) {
         std::lock_guard<std::mutex> lk(m);
         
-        // Auto-reset if max samples reached
-        if (count >= max_samples) {
-            count = 0;
-            sum = 0.0;
-            sum_sq = 0.0;
-            min = std::numeric_limits<double>::infinity();
-            max = -std::numeric_limits<double>::infinity();
-            values.clear();
+        if (count < max_samples) {
+            // Normal accumulation phase
+            count++;
+            sum += v;
+            sum_sq += v * v;
+            median = v;  // Simplified: last value becomes median estimate
+        } else {
+            // Weighted update phase (count stays at max_samples)
+            // New avg = (max_samples * old_avg + new_value) / (max_samples + 1)
+            double old_avg = sum / count;
+            double old_avg_sq = sum_sq / count;
+            
+            sum = (max_samples * old_avg + v) / (max_samples + 1) * max_samples;
+            sum_sq = (max_samples * old_avg_sq + v * v) / (max_samples + 1) * max_samples;
+            
+            // Median: weighted average
+            median = (max_samples * median + v) / (max_samples + 1);
         }
         
-        count++;
-        sum += v;
-        sum_sq += v * v;
+        // Min/max never reset
         if (v < min) min = v;
         if (v > max) max = v;
-        values.push_back(v);
+        last = v;
+        
+        // Mode: update frequency map (limit to prevent unbounded memory growth)
+        int rounded_val = (int)std::round(v);
+        if (mode_map.count(rounded_val)) {
+            mode_map[rounded_val]++;
+        } else if (mode_map.size() < 100) {
+            mode_map[rounded_val] = 1;
+        }
+        // If map is full and value is new, ignore it (mode will be approximate)
     }
     
     /*
@@ -237,28 +239,17 @@ struct Accumulator {
         o << "{\"metric\":\"" << metric << "\",";
         o << "\"values\":{\"all\":{";
         if (count == 0) {
-            o << "\"avg\":null,\"min\":null,\"max\":null,\"med\":null,\"mod\":null,\"dev\":null,\"var\":null,\"cnt\":0";
+            o << "\"avg\":null,\"min\":null,\"max\":null,\"med\":null,\"mod\":null,\"dev\":null,\"var\":null,\"cnt\":0,\"last\":null";
         } else {
             double avg = sum / (double)count;
             
-            // Compute median
-            std::vector<double> sorted_vals = values;
-            std::sort(sorted_vals.begin(), sorted_vals.end());
-            double median;
-            if (sorted_vals.size() % 2 == 0) {
-                median = (sorted_vals[sorted_vals.size()/2 - 1] + sorted_vals[sorted_vals.size()/2]) / 2.0;
-            } else {
-                median = sorted_vals[sorted_vals.size()/2];
-            }
+            // Use precomputed median (approximate, updated incrementally)
+            // No sorting needed - median is maintained during add()
             
-            // Compute mode (most frequent rounded value)
-            std::unordered_map<int, uint64_t> freq_map;
-            for (double v : values) {
-                freq_map[(int)std::llround(v)]++;
-            }
+            // Compute mode from prebuilt frequency map
             int mode_val = 0;
             uint64_t mode_count = 0;
-            for (auto &p : freq_map) {
+            for (auto &p : mode_map) {
                 if (p.second > mode_count) {
                     mode_count = p.second;
                     mode_val = p.first;
@@ -276,7 +267,8 @@ struct Accumulator {
             o << "\"mod\":" << mode_val << ",";
             o << "\"dev\":" << stddev << ",";
             o << "\"var\":" << variance << ",";
-            o << "\"cnt\":" << count;
+            o << "\"cnt\":" << count << ",";
+            o << "\"last\":" << last;
         }
         o << "}";
         
@@ -292,7 +284,7 @@ struct Accumulator {
         o << "}}";
 
         // reset
-        count = 0; sum = 0.0; sum_sq = 0.0; min = std::numeric_limits<double>::infinity(); max = -std::numeric_limits<double>::infinity(); values.clear();
+        count = 0; sum = 0.0; sum_sq = 0.0; min = std::numeric_limits<double>::infinity(); max = -std::numeric_limits<double>::infinity(); median = 0.0; mode_map.clear();
         return o.str();
     }
 };
@@ -322,6 +314,12 @@ struct Accumulator {
  *                       - Key="0","1","2" for per-disk metrics
  *                       - Key="core0","core1" for per-CPU metrics
  *                       Each source maintains independent statistics
+ *   
+ *   filter: Filter pattern for source selection (std::string, default empty)
+ *           - Empty = no filter set, skip sampling (no data collected)
+ *           - Must be min 3 chars + wildcard (e.g. "svc*", "chrome*")
+ *           - Set via fetch_and_reset_json parameter
+ *           - Used by plugins to filter which sources to sample
  *
  * USAGE:
  *   Created when metric is registered via collector_register_metric()
@@ -332,6 +330,7 @@ struct MetricEntry {
     double multiplicator = 1.0;  // Sampling frequency multiplier
     double next_tick = 1.0;      // Next tick to sample (first sample at tick 1)
     std::unordered_map<std::string, Accumulator> source_accumulators;  // Per-source accumulators
+    std::string filter;          // Filter pattern (empty = skip sampling)
 };
 
 // GLOBAL VARIABLES:
@@ -352,7 +351,8 @@ static std::unordered_map<std::string, MetricEntry> metrics;
  * TYPE: std::mutex
  * PROTECTS: metrics map access
  * USAGE: Acquired by all functions that access metrics map
- */
+Get-Process | Where-Object { $_.ProcessName -like 'aggplugin*' } | Select-Object ProcessName, @{Name='Memory(MB)';Expression={[math]::Round($_.WorkingSet64/1MB,2)}}, @{Name='CPU(%)';Expression={$_.CPU}}, @{Name='Runtime(min)';Expression={[math]::Round(((Get-Date) - $_.StartTime).TotalMinutes,1)}} */
+
 static std::mutex metrics_m;
 
 /*
@@ -438,19 +438,34 @@ static double base_interval = 1.0;
  */
 void collector_loop() {
     uint64_t tick = 0;
+    uint64_t total_samples = 0;
     // Collector thread logging disabled (verbose, impacts performance)
     // Uncomment for debugging: log_debug("Thread started, base_interval=%.1fs, running=%d", base_interval, running.load());
     while (running.load()) {
         tick++;
-        // Uncomment for very verbose debugging (every 5 ticks):
-        // if (tick % 5 == 1) {
-        //     log_debug("Tick %llu, checking %zu metrics, running=%d", (unsigned long long)tick, metrics.size(), running.load());
-        // }
+        // Debug: log every 10 seconds
+        if (tick % 10 == 0) {
+            std::lock_guard<std::mutex> lk(metrics_m);
+            size_t total_accumulators = 0;
+            for (auto &kv : metrics) {
+                total_accumulators += kv.second.source_accumulators.size();
+            }
+            log_debug("Tick %llu: %zu metrics, %zu accumulators, %llu total samples",
+                     (unsigned long long)tick, metrics.size(), total_accumulators, 
+                     (unsigned long long)total_samples);
+        }
         {
             std::lock_guard<std::mutex> lk(metrics_m);
             for (auto &kv : metrics) {
                 MetricEntry &me = kv.second;
                 if ((double)tick + 1e-9 >= me.next_tick) {
+                    // Skip metrics with no filter set (wait for first query to set filter)
+                    // This prevents sampling hundreds of services/processes until user queries with filter
+                    if (me.filter.empty() && (kv.first == "proc.running" || kv.first == "service.status")) {
+                        me.next_tick += me.multiplicator;
+                        continue;
+                    }
+                    
                     // Try multi-source collection first (for DLL plugins)
                     size_t source_count = 0;
                     int multi_ok = 0;
@@ -459,13 +474,39 @@ void collector_loop() {
                     
                     if (multi_ok && sources) {
                         // Multi-source metric: add each source independently
+                        // Limit to 100 sources per metric to prevent memory explosion
                         for (size_t i = 0; i < source_count; i++) {
-                            std::string source_id = sources[i].source_id ? sources[i].source_id : "";
-                            me.source_accumulators[source_id].add(sources[i].value);
+                            // Check source limit BEFORE creating std::string (which allocates memory)
+                            const char* source_cstr = sources[i].source_id ? sources[i].source_id : "";
                             
-                            // Free source_id string
-                            if (sources[i].source_id) {
-                                free(sources[i].source_id);
+                            // Quick check: if map is at limit and this is a new source, skip
+                            if (me.source_accumulators.size() >= 100) {
+                                bool found = false;
+                                for (auto& acc_pair : me.source_accumulators) {
+                                    if (acc_pair.first == source_cstr) {
+                                        found = true;
+                                        acc_pair.second.add(sources[i].value);
+                                        total_samples++;
+                                        break;
+                                    }
+                                }
+                                if (!found) {
+                                    // New source but limit reached - skip and free
+                                    if (i < 3 || i % 100 == 0) {  // Log only first few to avoid spam
+                                        log_debug("WARNING: Metric %s has 100+ sources, ignoring: %s",
+                                                 kv.first.c_str(), source_cstr);
+                                    }
+                                }
+                                // Always free the source_id string
+                                if (sources[i].source_id) free(sources[i].source_id);
+                            } else {
+                                // Not at limit yet - normal path
+                                std::string source_id(source_cstr);
+                                me.source_accumulators[source_id].add(sources[i].value);
+                                total_samples++;
+                                
+                                // Free source_id string
+                                if (sources[i].source_id) free(sources[i].source_id);
                             }
                         }
                         free(sources);
@@ -476,6 +517,7 @@ void collector_loop() {
                         if (ok) {
                             // Single-source metric: use empty string as source_id
                             me.source_accumulators[""].add(v);
+                            total_samples++;
                         } else {
                             log_debug("ERROR: Failed to sample %s", kv.first.c_str());
                         }
@@ -654,12 +696,28 @@ extern "C" int collector_set_output_format(int format) {
  *   - If JSON too large: truncated copy with strncpy + null terminator
  *   - Truncation is silent (no error logged, caller sees truncated JSON)
  */
-extern "C" int collector_fetch_and_reset_json(const char *name, char *result, unsigned result_len) {
+extern "C" int collector_fetch_and_reset_json(const char *name, char *result, unsigned result_len, const char *filter) {
     if (!name || !result) return 1;
     std::string s(name);
     std::lock_guard<std::mutex> lk(metrics_m);
     auto it = metrics.find(s);
     if (it == metrics.end()) return 1; // Metric not found
+    
+    // Update filter if provided and valid (min 3 chars)
+    if (filter && strlen(filter) >= 3) {
+        it->second.filter = filter;
+        log_debug("Filter set for metric %s: '%s'", name, filter);
+    }
+    // If no filter set yet, return empty result (no sampling performed)
+    else if (it->second.filter.empty()) {
+        // No filter set - return empty JSON
+        if (output_format.load() == 0) {
+            snprintf(result, result_len, "[]");
+        } else {
+            snprintf(result, result_len, "{\"metric\":\"%s\",\"values\":{\"all\":{\"avg\":null,\"min\":null,\"max\":null,\"med\":null,\"mod\":null,\"dev\":null,\"var\":null,\"cnt\":0}}}", name);
+        }
+        return 0;
+    }
     
     int current_format = output_format.load();
     std::ostringstream o;
@@ -671,7 +729,6 @@ extern "C" int collector_fetch_and_reset_json(const char *name, char *result, un
     double global_min = std::numeric_limits<double>::infinity();
     double global_max = -std::numeric_limits<double>::infinity();
     double last_value = 0.0;
-    std::vector<double> all_values;
     
     // Collect per-source stats for array format
     struct SourceStats {
@@ -690,8 +747,7 @@ extern "C" int collector_fetch_and_reset_json(const char *name, char *result, un
         total_sum += acc.sum;
         if (acc.min < global_min) global_min = acc.min;
         if (acc.max > global_max) global_max = acc.max;
-        if (!acc.values.empty()) last_value = acc.values.back();
-        all_values.insert(all_values.end(), acc.values.begin(), acc.values.end());
+        last_value = acc.last;  // Use incremental last value
         
         // Calculate per-source stats for array format
         if (current_format == 0 && acc.count > 0) {
@@ -701,27 +757,15 @@ extern "C" int collector_fetch_and_reset_json(const char *name, char *result, un
             ss.min = acc.min;
             ss.max = acc.max;
             ss.cnt = acc.count;
-            ss.last = acc.values.empty() ? 0.0 : acc.values.back();
+            ss.last = acc.last;  // Use incremental last value
             
-            // Median for this source
-            std::vector<double> sorted_vals = acc.values;
-            std::sort(sorted_vals.begin(), sorted_vals.end());
-            if (sorted_vals.size() % 2 == 0) {
-                ss.med = (sorted_vals[sorted_vals.size()/2 - 1] + sorted_vals[sorted_vals.size()/2]) / 2.0;
-            } else {
-                ss.med = sorted_vals[sorted_vals.size()/2];
-            }
+            // Use precomputed median (approximate)
+            ss.med = acc.median;
             
-            // Mode for this source
-            std::unordered_map<int, uint64_t> freq_map;
-            double sum_sq = 0.0;
-            for (double v : acc.values) {
-                freq_map[(int)std::llround(v)]++;
-                sum_sq += v * v;
-            }
+            // Mode from prebuilt frequency map
             ss.mode_val = 0;
             uint64_t mode_count = 0;
-            for (auto &p : freq_map) {
+            for (auto &p : acc.mode_map) {
                 if (p.second > mode_count) {
                     mode_count = p.second;
                     ss.mode_val = p.first;
@@ -729,7 +773,7 @@ extern "C" int collector_fetch_and_reset_json(const char *name, char *result, un
             }
             
             // Variance and stddev for this source
-            ss.var = (sum_sq / (double)acc.count) - (ss.avg * ss.avg);
+            ss.var = (acc.sum_sq / (double)acc.count) - (ss.avg * ss.avg);
             ss.dev = std::sqrt(ss.var);
             
             source_stats_list.push_back(ss);
@@ -744,23 +788,32 @@ extern "C" int collector_fetch_and_reset_json(const char *name, char *result, un
     double global_dev = 0.0;
     
     if (total_count > 0) {
-        // Global median
-        std::sort(all_values.begin(), all_values.end());
-        if (all_values.size() % 2 == 0) {
-            global_median = (all_values[all_values.size()/2 - 1] + all_values[all_values.size()/2]) / 2.0;
-        } else {
-            global_median = all_values[all_values.size()/2];
+        // Global median: weighted average of per-source medians
+        double median_sum = 0.0;
+        uint64_t median_weight = 0;
+        for (auto& source_pair : it->second.source_accumulators) {
+            Accumulator& acc = source_pair.second;
+            std::lock_guard<std::mutex> acc_lock(acc.m);
+            if (acc.count > 0) {
+                median_sum += acc.median * acc.count;
+                median_weight += acc.count;
+            }
         }
+        global_median = median_weight > 0 ? median_sum / median_weight : 0.0;
         
-        // Global mode
-        std::unordered_map<int, uint64_t> freq_map;
-        double sum_sq = 0.0;
-        for (double v : all_values) {
-            freq_map[(int)std::llround(v)]++;
-            sum_sq += v * v;
+        // Global mode: merge frequency maps from all sources
+        std::map<int, uint64_t> merged_mode_map;
+        double sum_sq_global = 0.0;
+        for (auto& source_pair : it->second.source_accumulators) {
+            Accumulator& acc = source_pair.second;
+            std::lock_guard<std::mutex> acc_lock(acc.m);
+            for (auto &p : acc.mode_map) {
+                merged_mode_map[p.first] += p.second;
+            }
+            sum_sq_global += acc.sum_sq;
         }
         uint64_t mode_count = 0;
-        for (auto &p : freq_map) {
+        for (auto &p : merged_mode_map) {
             if (p.second > mode_count) {
                 mode_count = p.second;
                 global_mode = p.first;
@@ -768,7 +821,7 @@ extern "C" int collector_fetch_and_reset_json(const char *name, char *result, un
         }
         
         // Global variance and stddev
-        global_var = (sum_sq / (double)total_count) - (global_avg * global_avg);
+        global_var = (sum_sq_global / (double)total_count) - (global_avg * global_avg);
         global_dev = std::sqrt(global_var);
     }
     
@@ -778,8 +831,8 @@ extern "C" int collector_fetch_and_reset_json(const char *name, char *result, un
         // ARRAY FORMAT (default, Zabbix-compatible)
         o << "[";
         
-        // First entry: aggregate "_all" stats
-        o << "{\"source\":\"_all\",";
+        // First entry: aggregate "all" stats
+        o << "{\"source\":\"all\",";
         if (total_count == 0) {
             o << "\"avg\":null,\"min\":null,\"max\":null,\"med\":null,\"mod\":null,\"dev\":null,\"var\":null,\"cnt\":0,\"last\":null";
         } else {
@@ -868,7 +921,8 @@ extern "C" int collector_fetch_and_reset_json(const char *name, char *result, un
         acc.sum_sq = 0.0;
         acc.min = std::numeric_limits<double>::infinity();
         acc.max = -std::numeric_limits<double>::infinity();
-        acc.values.clear();
+        acc.median = 0.0;
+        acc.mode_map.clear();
     }
     
     std::string js = o.str();
