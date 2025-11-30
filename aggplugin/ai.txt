@@ -1,8 +1,10 @@
 === AI CONTEXT FILE - AGGPLUGIN ===
-Last Updated: November 25, 2025
-Version: tmp0.1 (Preliminary Release) - Plugin Framework + Installer Integration COMPLETE
+Last Updated: November 30, 2025
+Version: tmp0.1 (Preliminary Release) - Array Output Format + Plugin Framework COMPLETE
 
 Author: Claude Sonnet 4.5 (AI) | Lead: lukas@plachy.eu
+
+🎉 NEW (November 30, 2025): ARRAY OUTPUT FORMAT - Zabbix-compatible JSON format now default!
 
 *** PURPOSE OF THIS FILE ***
 This file provides essential context for AI assistants (Claude, GPT, etc.) working on this project.
@@ -29,8 +31,72 @@ Without updates, future sessions will lack context and may duplicate work or mak
 
 Zabbix Agent2 external plugin for Windows providing continuous metric aggregation with comprehensive statistics (avg, min, max, median, mode, standard deviation, variance).
 
-🎉 PLUGIN FRAMEWORK FULLY OPERATIONAL - Tested and working with 3 example plugins
+🎉 PLUGIN FRAMEWORK FULLY OPERATIONAL - Tested and working with 4 example plugins
 🎉 INSTALLER INTEGRATION COMPLETE - instpackage_my1 automatically deploys and configures aggplugin
+🎉 ARRAY OUTPUT FORMAT - Zabbix-compatible format (matches proc.get, vfs.fs.get conventions)
+
+=== ARRAY OUTPUT FORMAT (November 30, 2025) ===
+
+**BREAKING CHANGE**: Output format now defaults to array format for Zabbix compatibility.
+
+**Array Format (DEFAULT):**
+```json
+[
+  {"source":"_all","avg":25.1,"min":22.4,"max":26.5,"med":25.2,"mod":25,"dev":1.34,"var":1.79,"cnt":8,"last":25.2},
+  {"source":"C:","avg":0.012,"min":0,"max":0.158,"med":0.006,"mod":0,"dev":0.026,"var":0.0007,"cnt":332,"last":0.011}
+]
+```
+- JSONPath: `$[?(@.source=="_all")].avg` or `$[0].avg` for aggregate
+- JSONPath: `$[?(@.source=="C:")].avg` for specific source
+- Matches Zabbix built-in metrics (proc.get, vfs.fs.get, vfs.dir.get)
+
+**NestedJSON Format (LEGACY - via config):**
+```json
+{
+  "metric": "vfs.queue.length",
+  "values": {
+    "all": {"avg":0.006,"min":0,"max":0.158,"med":0,"mod":0,"dev":0.02,"var":0.0004,"cnt":632},
+    "sources": {
+      "C:": {"avg":0.012,"min":0,"max":0.158,"med":0.006,"mod":0,"dev":0.026,"var":0.0007,"cnt":332}
+    }
+  }
+}
+```
+- JSONPath: `$.values.all.avg` for aggregate
+- Enable via: `Plugins.Aggplugin.OutputFormat=nestedJSON` in config
+
+**Implementation:**
+- Config: `Plugins.Aggplugin.OutputFormat` (array | nestedJSON, default: array)
+- Go: `cfgOutputFormat` variable, parsed in loadConfig(), calls C.collector_set_output_format()
+- C++: `collector_set_output_format(int format)` API, atomic flag, complete rewrite of fetch_and_reset_json()
+- Thread-safe: Uses std::atomic<int> for format selection
+
+**Discovery Script (Updated for Array Format):**
+```javascript
+var root = JSON.parse(value);
+var out = [];
+for (var i = 0; i < root.length; i++) {
+    var entry = root[i];
+    var source = entry.source;
+    for (var stat in entry) {
+        if (stat === "source") continue;
+        out.push({
+            "{#SOURCE}": source,
+            "{#VALNAME}": stat,
+            "{#VALVALUE}": entry[stat]
+        });
+    }
+}
+return JSON.stringify(out);
+```
+
+**Files Modified:**
+- go_agent2_wrapper/main.go (config parsing, format setting)
+- cpp_common/collector.hpp (API declaration)
+- cpp_common/collector.cpp (~300 line rewrite of fetch_and_reset_json)
+- config_template/aggplugin.conf (OutputFormat documentation)
+
+**Commit:** 9453fca (November 30, 2025) - "Implement array output format as default (Zabbix-compatible)"
 
 === ARCHITECTURE ===
 

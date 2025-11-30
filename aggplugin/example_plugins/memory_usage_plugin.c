@@ -27,7 +27,7 @@
  *   - Can be extended to return total, used, percent, etc.
  */
 
-#include "../cpp_common/measurement_plugin_api.h"
+#include "measurement_plugin_api.h"
 #include <windows.h>
 #include <stdio.h>
 #include <stdbool.h>

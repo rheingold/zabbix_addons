@@ -26,7 +26,7 @@
  *   - Thread-safe: Uses static variables with proper initialization
  */
 
-#include "../cpp_common/measurement_plugin_api.h"
+#include "measurement_plugin_api.h"
 #include <windows.h>
 #include <stdio.h>
 #include <stdbool.h>
