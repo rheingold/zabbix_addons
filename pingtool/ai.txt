@@ -1,0 +1,350 @@
+=== AI CONTEXT FILE - PINGTOOL ===
+Last Updated: December 2, 2025
+Version: 2.0 (Agent2 Go Plugin Architecture)
+
+Author: Claude Sonnet 4.5 (AI) | Lead: lukas@plachy.eu
+
+*** PURPOSE OF THIS FILE ***
+This file provides essential context for AI assistants working on the pingtool project.
+Pingtool is a Zabbix Agent 2 Go-based plugin for Windows ICMP ping with JSON array output.
+
+⚠️⚠️⚠️ CRITICAL: KEEP BOTH FILES UPDATED ⚠️⚠️⚠️
+AI assistants MUST update BOTH ai.txt AND ai_priv/ai_priv.txt throughout work sessions.
+
+*** PROJECT OVERVIEW ***
+
+**ARCHITECTURE CHANGE (December 2, 2025):**
+Converted from standalone CLI tool to Zabbix Agent 2 Go plugin with CGO integration.
+
+Zabbix Agent 2 external plugin for Windows providing on-demand ICMP ping functionality.
+- On-demand execution (no background collector - unlike aggplugin)
+- Single-target ping per call (parameters: target, count, timeout)
+- JSON array output matching Zabbix conventions (proc.get, vfs.fs.get style)
+- No admin privileges needed (uses Windows ICMP API)
+- IPv4 and IPv6 support
+
+=== ARCHITECTURE ===
+
+**Components:**
+1. Go Wrapper (main.go):
+   - Implements Zabbix SDK plugin interface (plugin.Exporter)
+   - Registers metric: ping.icmp[target,count,timeout]
+   - Marshals parameters and calls C library via CGO
+   
+2. C Library (pingtool_lib.c):
+   - Exports ping_execute() function for CGO
+   - Performs IPv4/IPv6 ICMP ping operations
+   - Builds JSON array string in buffer
+   - Uses Windows ICMP API (IcmpSendEcho, Icmp6SendEcho2)
+
+3. Windows ICMP API:
+   - IcmpCreateFile() / Icmp6CreateFile()
+   - IcmpSendEcho() / Icmp6SendEcho2()
+   - No admin privileges required
+
+**Data Flow:**
+Zabbix Agent2 → Named Pipes → Go Plugin → CGO → C ping_execute() → Windows ICMP API → JSON result
+
+**Key Difference from aggplugin:**
+- NO background sampling thread
+- NO continuous data collection
+- Each metric call executes ping synchronously (blocking)
+- Execution time: 1-10+ seconds (count × timeout)
+- Suitable for on-demand checks, not high-frequency monitoring
+
+=== OUTPUT FORMAT ===
+
+**Default: Zabbix Array Format**
+```json
+[
+  {"target":"192.168.254.1","seq":1,"ms":1.000,"ok":true},
+  {"target":"192.168.254.1","seq":2,"ms":0.000,"ok":true},
+  {"target":"192.168.254.1","seq":3,"ms":15.000,"ok":true},
+  {"target":"192.168.254.1","type":"summary","success_ratio":1.0000,"avg_ms":5.333}
+]
+```
+
+Format details:
+- Flat JSON array (matches aggplugin convention)
+- Each ping = one array element with target, seq, ms, ok fields
+- Summary = final array element with type:"summary", success_ratio (0..1), avg_ms
+- JSONPath: `$[?(@.type=="summary")].success_ratio` for success ratio
+- JSONPath: `$[?(@.type=="summary")].avg_ms` for average response time
+
+**LLD Mode (-output lld):**
+Same structure but with discovery macros:
+```json
+[
+  {"{#TARGET}":"192.168.254.1","{#SEQ}":1,"{#MS}":1.000,"{#OK}":1},
+  ...
+  {"{#TARGET}":"192.168.254.1","{#TYPE}":"summary","{#SUCCESS_RATIO}":1.0000,"{#AVG_MS}":5.333}
+]
+```
+
+**Full Mode (-output full):**
+Verbose format with metadata (for debugging):
+```json
+{
+  "target": "192.168.254.1",
+  "count": 3, "timeout_ms": 1000, "ttl": 64, "len": 32,
+  "data": [...],
+  "summary": {"success_ratio": 1.0000, "avg_ms": 5.333}
+}
+```
+
+=== ARCHITECTURE ===
+
+Single C source file with Windows API dependencies:
+- winsock2.h - Network address resolution (getaddrinfo)
+- iphlpapi.h - ICMP API (IcmpCreateFile, IcmpSendEcho, Icmp6SendEcho2)
+- icmpapi.h - ICMP structures and constants
+
+No external libraries or DLLs required beyond Windows system libraries.
+
+Components:
+- ping_ipv4() - IPv4 ICMP ping using IcmpSendEcho
+- ping_ipv6() - IPv6 ICMP ping using Icmp6SendEcho2
+- print_json_data_only() - Default array output
+- print_json_lld() - LLD discovery format
+- print_json_full() - Verbose format with metadata
+
+=== PARAMETERS ===
+
+**Metric Key:** ping.icmp[target,count,timeout]
+
+Parameters:
+- target (required) - Hostname or IP address
+- count (optional) - Number of pings (default: 3, max: 100)
+- timeout (optional) - Timeout per ping in milliseconds (default: 1000)
+
+Internal parameters (hardcoded in Go wrapper):
+- ttl: 64 (IPv4 TTL / IPv6 hop limit)
+- len: 32 (payload size in bytes)
+- df: 0 (IPv4 Don't Fragment flag)
+- ipv6: 0 (prefer IPv4, fallback to IPv6)
+
+Configuration (zabbix_agent2.d/plugins.d/pingtool.conf):
+- Plugins.Pingtool.System.Path (required) - Path to pingtool.exe
+- Plugins.Pingtool.DebugLevel (optional) - 0-5, default 0
+- Plugins.Pingtool.DefaultCount (optional) - Default ping count, default 3
+- Plugins.Pingtool.DefaultTimeout (optional) - Default timeout in ms, default 1000
+
+=== BUILD ===
+
+Requirements:
+- Go 1.21+ (with CGO enabled)
+- MinGW-w64 gcc (must be in PATH, for CGO compilation)
+- Windows SDK headers (winsock2.h, iphlpapi.h, icmpapi.h)
+- Zabbix Agent 2 SDK v1.2.2-0.20251007063238-42702926b56d (go.mod)
+
+Environment Setup:
+```powershell
+. .\init-env.ps1
+```
+This sets up:
+- Go toolchain (from C:\Users\plachy\Documents\Dev\_ToolsGo)
+- MinGW-w64 gcc (from C:\msys64\mingw64\bin)
+- CGO_ENABLED=1
+- GOPATH
+
+Build command:
+```powershell
+powershell -ExecutionPolicy Bypass -File build_plugin.ps1
+```
+
+Build process:
+1. init-env.ps1 sets up environment variables
+2. go build compiles main.go
+3. CGO compiles pingtool_lib.c and links with Go
+4. Links Windows libraries: iphlpapi, ws2_32
+5. Output: build/pingtool.exe (~8-10 MB with Go runtime)
+
+Files involved:
+- main.go - Go plugin wrapper (Zabbix SDK integration)
+- pingtool_lib.c - C ICMP ping implementation
+- pingtool_lib.h - C library header
+- go.mod - Go module dependencies
+- build_plugin.ps1 - Build script
+- init-env.ps1 - Environment initialization
+
+=== ZABBIX INTEGRATION ===
+
+**Plugin Configuration:**
+
+Add to Zabbix Agent2 config: `C:\Zabbix\conf\zabbix_agent2.d\plugins.d\pingtool.conf`
+
+```ini
+# Pingtool Agent2 Plugin Configuration
+Plugins.Pingtool.System.Path=C:\Zabbix\plugins\pingtool.exe
+
+# Optional parameters
+# Plugins.Pingtool.DebugLevel=0
+# Plugins.Pingtool.DefaultCount=3
+# Plugins.Pingtool.DefaultTimeout=1000
+```
+
+**Zabbix Item Examples:**
+
+1. Success Ratio:
+   - Key: `ping.icmp[192.168.254.1,3,1000]`
+   - Preprocessing: JSONPath `$[?(@.type=="summary")].success_ratio.first()`
+   - Type: Numeric (float)
+
+2. Average Response Time:
+   - Key: `ping.icmp[192.168.254.1,3,1000]`
+   - Preprocessing: JSONPath `$[?(@.type=="summary")].avg_ms.first()`
+   - Type: Numeric (float)
+
+3. Last Ping Time:
+   - Key: `ping.icmp[192.168.254.1,3,1000]`
+   - Preprocessing: JSONPath `$[-2].ms` (second-to-last, excluding summary)
+   - Type: Numeric (float)
+
+4. Packet Loss Percentage:
+   - Key: `ping.icmp[192.168.254.1,3,1000]`
+   - Preprocessing: JSONPath `$[?(@.type=="summary")].success_ratio.first()`
+   - Preprocessing: JavaScript `return (1 - value) * 100;`
+   - Type: Numeric (float)
+
+**Testing:**
+
+Local test (from command line):
+```powershell
+cd C:\Zabbix\plugins
+.\pingtool.exe
+# Plugin will wait for Agent2 connection - Ctrl+C to stop
+```
+
+Test with zabbix_get:
+```bash
+zabbix_get -s <windows-host> -k "ping.icmp[127.0.0.1,3,1000]"
+```
+
+**Deployment:**
+1. Build: `build_plugin.ps1` → `build/pingtool.exe`
+2. Copy to: `C:\Zabbix\plugins\pingtool.exe`
+3. Create config: `C:\Zabbix\conf\zabbix_agent2.d\plugins.d\pingtool.conf`
+4. Restart Agent2: `Restart-Service "Zabbix Agent 2"`
+5. Test with zabbix_get
+
+=== TECHNICAL NOTES ===
+
+**Windows ICMP API:**
+- IcmpCreateFile() - Creates ICMP handle (IPv4)
+- IcmpSendEcho() - Sends ICMP echo request (IPv4)
+- Icmp6CreateFile() - Creates ICMPv6 handle
+- Icmp6SendEcho2() - Sends ICMPv6 echo request
+- No admin privileges required (unlike raw sockets)
+
+**Response Time Measurement:**
+- Uses GetTickCount() for manual timing (fallback)
+- IcmpSendEcho provides RoundTripTime in reply structure (when available)
+- IPv6 lacks RoundTripTime field, always uses manual measurement
+- Resolution: 1ms (GetTickCount granularity)
+
+**Error Handling:**
+- Timeouts: ms = null, ok = false, err = "timeout"
+- Host unreachable: ms = null, ok = false, err = "bad_destination"
+- ICMP errors: ms = null, ok = false, err = "icmp_error"
+- Success: ms = <float>, ok = true, no err field
+
+**Memory Management:**
+- Samples allocated on heap (calloc)
+- Reply buffers sized for ICMP_ECHO_REPLY + payload + overhead
+- All allocations freed before exit
+- No memory leaks
+
+=== TESTING ===
+
+**Localhost (always works):**
+```powershell
+.\pingtool.exe -target 127.0.0.1 -count 3
+```
+
+**Local Gateway (check network):**
+```powershell
+.\pingtool.exe -target 192.168.254.1 -count 5 -timeout 1000
+```
+
+**IPv6 (if supported):**
+```powershell
+.\pingtool.exe -target ::1 -ipv6 1 -count 3
+```
+
+**LLD Format:**
+```powershell
+.\pingtool.exe -target 192.168.254.1 -count 3 -output lld
+```
+
+=== FILES ===
+
+**Go Plugin:**
+- main.go - Go plugin wrapper (~200 lines, Zabbix SDK integration)
+- go.mod - Go module dependencies (Zabbix SDK v1.2.2+)
+- go.sum - Go dependency checksums (auto-generated)
+
+**C Library:**
+- pingtool_lib.c - ICMP ping implementation (~300 lines)
+- pingtool_lib.h - C library header (API declaration)
+
+**Build System:**
+- build_plugin.ps1 - Build script (Go + CGO compilation)
+- init-env.ps1 - Environment setup (Go, gcc, paths)
+
+**Legacy (v1.0 standalone tool):**
+- pingtool.c - Original standalone CLI version (~350 lines)
+- build.ps1 - Old build script for standalone exe
+
+**Documentation:**
+- README.md - Technical documentation
+- INSTALL.md - Zabbix integration guide (needs update for v2.0)
+- ai.txt - This file (project context)
+- ai_priv/ai_priv.txt - Local environment specifics
+
+**Output:**
+- build/pingtool.exe - Compiled Go plugin (~8-10 MB with Go runtime)
+
+=== DEPLOYMENT ===
+
+**Package Contents:**
+- pingtool.exe (standalone, no dependencies)
+- INSTALL.md (Zabbix integration guide)
+- README.md (technical reference)
+
+**Installation:**
+1. Copy pingtool.exe to C:\Zabbix\bin\ (or any location)
+2. Add UserParameter to Zabbix Agent config
+3. Restart Zabbix Agent
+4. Test with zabbix_get
+
+No configuration file needed - pure CLI tool.
+
+=== KNOWN LIMITATIONS ===
+
+- Single target per invocation (by design for Zabbix integration)
+- Outbound ICMP may be blocked by firewall/network
+- IPv6 requires Windows Vista/Server 2008 or newer
+- Localhost always shows ~0ms (sub-millisecond responses)
+- Max 100 pings per invocation (sanity limit)
+- 1ms resolution (GetTickCount granularity)
+
+=== VERSION HISTORY ===
+
+**v2.0 (December 2, 2025) - Agent2 Plugin Architecture:**
+- BREAKING CHANGE: Converted from standalone CLI to Agent2 Go plugin
+- Implements Zabbix SDK plugin.Exporter interface
+- CGO integration with C ICMP library
+- Metric: ping.icmp[target,count,timeout]
+- On-demand execution (no background collector)
+- Same JSON array output format as v1.0
+- Requires Zabbix Agent 2 (not compatible with Agent 1)
+- File size increased to ~8-10 MB (includes Go runtime)
+
+**v1.0 (December 1, 2025) - Initial Release:**
+- Standalone CLI tool with UserParameter integration
+- IPv4 and IPv6 support
+- Zabbix array format (flat JSON array with summary)
+- LLD discovery format
+- No admin privileges required
+- Tested on Windows 10/11
+- File size: ~50 KB (pure C, no runtime)

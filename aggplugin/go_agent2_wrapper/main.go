@@ -172,9 +172,20 @@ var cfgPreloadDelay = 0.0                   // Seconds to wait for baseline (0 =
 var cfgPluginPath = ""                      // Path pattern for measurement plugin DLLs (e.g., C:\Zabbix\plugins\*.dll)
 var cfgDLLMetrics = make(map[string]string) // Map of [dllname.dll] → comma-separated metric keys
 var cfgOutputFormat = "array"               // Output format: "array" (default, Zabbix-compatible) or "nestedJSON" (legacy)
-var cfgIntervalCPU = 1.0                    // Sampling interval for CPU/Memory metrics in seconds (default: 1.0)
-var cfgIntervalDisk = 5.0                   // Sampling interval for Disk I/O metrics in seconds (default: 5.0)
-var cfgIntervalService = 20.0               // Sampling interval for Service/Process metrics in seconds (default: 20.0)
+
+// Plugin-specific sampling intervals (seconds) - keyed by plugin name (without _plugin.dll suffix)
+var cfgPluginIntervals = map[string]float64{
+	"cpu_load":     1.0,  // cpu_load_plugin.dll
+	"memory_usage": 1.0,  // memory_usage_plugin.dll
+	"disk_stats":   5.0,  // disk_stats_plugin.dll
+	"proc_status":  20.0, // proc_status_plugin.dll
+	"ping":         40.0, // ping_plugin.dll - every 40 seconds
+}
+
+// Legacy interval variables (kept for backward compatibility)
+var cfgIntervalCPU = 1.0      // Deprecated: use Plugins.Aggplugin.Interval.cpu_load
+var cfgIntervalDisk = 5.0     // Deprecated: use Plugins.Aggplugin.Interval.disk_stats
+var cfgIntervalService = 20.0 // Deprecated: use Plugins.Aggplugin.Interval.proc_status
 
 // ========================================================================
 // MEASUREMENT PLUGIN LOADER
@@ -773,21 +784,38 @@ func loadConfig() {
 				}
 
 			case "Plugins.Aggplugin.IntervalCPU":
+				// Legacy config key - map to cpu_load plugin
 				if interval, err := strconv.ParseFloat(value, 64); err == nil && interval > 0 {
 					cfgIntervalCPU = interval
-					debugLog(DBG_INFO, fmt.Sprintf("Config: IntervalCPU=%.1fs (from %s)", interval, configPath))
+					cfgPluginIntervals["cpu_load"] = interval
+					cfgPluginIntervals["memory_usage"] = interval
+					debugLog(DBG_INFO, fmt.Sprintf("Config: IntervalCPU=%.1fs (legacy key, from %s)", interval, configPath))
 				}
 
 			case "Plugins.Aggplugin.IntervalDisk":
+				// Legacy config key - map to disk_stats plugin
 				if interval, err := strconv.ParseFloat(value, 64); err == nil && interval > 0 {
 					cfgIntervalDisk = interval
-					debugLog(DBG_INFO, fmt.Sprintf("Config: IntervalDisk=%.1fs (from %s)", interval, configPath))
+					cfgPluginIntervals["disk_stats"] = interval
+					debugLog(DBG_INFO, fmt.Sprintf("Config: IntervalDisk=%.1fs (legacy key, from %s)", interval, configPath))
 				}
 
 			case "Plugins.Aggplugin.IntervalService":
+				// Legacy config key - map to proc_status plugin
 				if interval, err := strconv.ParseFloat(value, 64); err == nil && interval > 0 {
 					cfgIntervalService = interval
-					debugLog(DBG_INFO, fmt.Sprintf("Config: IntervalService=%.1fs (from %s)", interval, configPath))
+					cfgPluginIntervals["proc_status"] = interval
+					debugLog(DBG_INFO, fmt.Sprintf("Config: IntervalService=%.1fs (legacy key, from %s)", interval, configPath))
+				}
+
+			default:
+				// Check for plugin-specific interval: Plugins.Aggplugin.Interval.<plugin_name>
+				if strings.HasPrefix(key, "Plugins.Aggplugin.Interval.") {
+					pluginName := strings.TrimPrefix(key, "Plugins.Aggplugin.Interval.")
+					if interval, err := strconv.ParseFloat(value, 64); err == nil && interval > 0 {
+						cfgPluginIntervals[pluginName] = interval
+						debugLog(DBG_INFO, fmt.Sprintf("Config: Interval.%s=%.1fs (from %s)", pluginName, interval, configPath))
+					}
 				}
 			}
 		}
@@ -842,33 +870,48 @@ func main() {
 		debugLog(DBG_ERROR, fmt.Sprintf("Failed to load measurement plugins: %v", err))
 	}
 
-	// Register all metrics with collector using appropriate sampling intervals
+	// Register all metrics with collector using plugin-specific sampling intervals
 	debugLog(DBG_INFO, fmt.Sprintf("Registering %d plugin(s) with collector...", len(loadedPlugins)))
-	debugLog(DBG_INFO, fmt.Sprintf("Sampling intervals: CPU/Memory=%.1fs, Disk=%.1fs, Service/Process=%.1fs",
-		cfgIntervalCPU, cfgIntervalDisk, cfgIntervalService))
+	for pluginName, interval := range cfgPluginIntervals {
+		debugLog(DBG_VERBOSE, fmt.Sprintf("Plugin interval: %s=%.1fs", pluginName, interval))
+	}
+
 	for _, loadedPlugin := range loadedPlugins {
-		for _, keyInfo := range loadedPlugin.Info.Keys {
-			// Determine sampling multiplicator based on metric type
-			var multiplicator float64 = cfgIntervalCPU
+		// Extract plugin name from Info.Name (e.g., "CPULoad" -> "cpu_load")
+		// Or use a mapping based on the DLL path
+		pluginName := strings.ToLower(loadedPlugin.Info.Name)
+		pluginName = strings.ReplaceAll(pluginName, "plugin", "")
+		pluginName = strings.ReplaceAll(pluginName, "load", "_load")
+		pluginName = strings.ReplaceAll(pluginName, "usage", "_usage")
+		pluginName = strings.ReplaceAll(pluginName, "stats", "_stats")
+		pluginName = strings.ReplaceAll(pluginName, "status", "_status")
+		pluginName = strings.Trim(pluginName, "_")
 
-			metricKey := keyInfo.Key
-
-			// Disk I/O metrics: use configured disk interval
-			if strings.HasPrefix(metricKey, "disk.io.") ||
-				strings.HasPrefix(metricKey, "vfs.") ||
-				strings.HasPrefix(metricKey, "storage.") {
-				multiplicator = cfgIntervalDisk
-				debugLog(DBG_VERBOSE, fmt.Sprintf("Metric %s: Disk I/O type, sampling every %.1f seconds", metricKey, multiplicator))
-				// Service/Process metrics: use configured service interval
-			} else if metricKey == "proc.running" || metricKey == "service.status" {
-				multiplicator = cfgIntervalService
-				debugLog(DBG_VERBOSE, fmt.Sprintf("Metric %s: Service/Process type, sampling every %.1f seconds", metricKey, multiplicator))
-				// CPU/Memory metrics: use configured CPU interval (default)
-			} else {
-				multiplicator = cfgIntervalCPU
-				debugLog(DBG_VERBOSE, fmt.Sprintf("Metric %s: CPU/Memory type, sampling every %.1f seconds", metricKey, multiplicator))
+		// Get interval for this plugin (or use default 1.0)
+		multiplicator := 1.0
+		if interval, ok := cfgPluginIntervals[pluginName]; ok {
+			multiplicator = interval
+		} else {
+			// Try legacy mapping for backward compatibility
+			for _, keyInfo := range loadedPlugin.Info.Keys {
+				metricKey := keyInfo.Key
+				if strings.HasPrefix(metricKey, "disk.io.") ||
+					strings.HasPrefix(metricKey, "vfs.") ||
+					strings.HasPrefix(metricKey, "storage.") {
+					multiplicator = cfgIntervalDisk
+					break
+				} else if metricKey == "proc.running" || metricKey == "service.status" {
+					multiplicator = cfgIntervalService
+					break
+				} else {
+					multiplicator = cfgIntervalCPU
+				}
 			}
+		}
 
+		debugLog(DBG_INFO, fmt.Sprintf("Plugin %s (%s): interval=%.1fs", loadedPlugin.Info.Name, pluginName, multiplicator))
+
+		for _, keyInfo := range loadedPlugin.Info.Keys {
 			cName := C.CString(keyInfo.Key)
 			ret := C.collector_register_metric(cName, C.double(multiplicator))
 			C.free(unsafe.Pointer(cName))

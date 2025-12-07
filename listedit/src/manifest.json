@@ -1,0 +1,26 @@
+{
+    "manifest_version": 2,
+    "type": "module",
+    "id": "listedit",
+    "name": "Macro List Editor",
+    "version": "0.1.0",
+    "namespace": "ListEdit",
+    "author": "lukas@plachy.eu",
+    "url": "https://github.com/rheingold/zabbix_addons",
+    "description": "Edit list-type template macros ending with _LIST}. Supports pipe-separated format with headers ({#COL1}|{#COL2},val1|val2) and JSON array format ([\"val1\",\"val2\"]).",
+    "actions": {
+        "listedit.editor": {
+            "class": "Editor",
+            "view": "editor"
+        },
+        "listedit.macrolist": {
+            "class": "MacroList"
+        },
+        "listedit.macroupdate": {
+            "class": "MacroUpdate"
+        },
+        "listedit.hostlist": {
+            "class": "HostList"
+        }
+    }
+}

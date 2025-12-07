@@ -1,0 +1,342 @@
+// pingtool.c - Standalone Windows ping tool returning JSON for Zabbix
+// Build: gcc -O2 -Wall -o pingtool.exe pingtool.c -lIphlpapi -lws2_32
+// Uses Windows ICMP API (no admin required) for IPv4 and IPv6
+
+#define _WIN32_WINNT 0x0601
+// winsock2 must be included before windows.h
+#include <winsock2.h>
+#include <windows.h>
+#include <ws2tcpip.h>
+#include <iphlpapi.h>
+#include <icmpapi.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdbool.h>
+
+#pragma comment(lib, "Iphlpapi.lib")
+#pragma comment(lib, "Ws2_32.lib")
+
+typedef struct {
+    int seq;
+    double ms;    // -1 for timeout
+    bool ok;
+    const char *err;
+} ping_sample_t;
+
+typedef enum {
+    OUTPUT_FULL = 0,     // Full object with metadata, data[], summary
+    OUTPUT_DATA_ONLY,    // { "data": [ {..}, ... ] }
+    OUTPUT_LLD           // { "data": [ { "{#...}": ... }, ... ] }
+} output_mode_t;
+
+static void print_usage(void) {
+    fprintf(stderr,
+        "Usage: pingtool -target <host> [-count N] [-timeout MS] [-ttl N] [-len N] [-df 0|1] [-ipv6 0|1]\n"
+        "Output: JSON with { target, data: [{seq,ms,ok,err?}], summary:{success_ratio,avg_ms} }\n");
+}
+
+static int parse_int(const char *s, int def) {
+    if (!s || !*s) return def;
+    char *end = NULL;
+    long v = strtol(s, &end, 10);
+    if (end == s || *end != '\0') return def;
+    return (int)v;
+}
+
+static bool parse_bool01(const char *s, bool def) {
+    if (!s || !*s) return def;
+    if (strcmp(s, "1") == 0 || _stricmp(s, "true") == 0 || _stricmp(s, "yes") == 0) return true;
+    if (strcmp(s, "0") == 0 || _stricmp(s, "false") == 0 || _stricmp(s, "no") == 0) return false;
+    return def;
+}
+
+static int resolve_host(const char *host, bool prefer_ipv6, struct addrinfo **out_ai) {
+    struct addrinfo hints; memset(&hints, 0, sizeof(hints));
+    hints.ai_socktype = SOCK_STREAM; // any
+    hints.ai_family = prefer_ipv6 ? AF_INET6 : AF_INET;
+    // Try preferred family first
+    int rc = getaddrinfo(host, NULL, &hints, out_ai);
+    if (rc == 0) return (*out_ai)->ai_family;
+    // Fallback to any family
+    hints.ai_family = AF_UNSPEC;
+    rc = getaddrinfo(host, NULL, &hints, out_ai);
+    if (rc != 0) return AF_UNSPEC;
+    return (*out_ai)->ai_family;
+}
+
+static DWORD now_ms(void) {
+    return GetTickCount();
+}
+
+static double clamp_zero(double v) { return v < 0 ? 0 : v; }
+
+static int ping_ipv4(const struct sockaddr_in *sin, int count, int timeout_ms, int ttl, int payload_len, bool df,
+                     ping_sample_t *samples) {
+    HANDLE hIcmp = IcmpCreateFile();
+    if (hIcmp == INVALID_HANDLE_VALUE) return -1;
+
+    // Payload
+    if (payload_len < 0) payload_len = 32;
+    if (payload_len > 1400) payload_len = 1400;
+    char *sendbuf = (char*)malloc((size_t)payload_len);
+    if (!sendbuf) { IcmpCloseHandle(hIcmp); return -1; }
+    memset(sendbuf, 'A', (size_t)payload_len);
+
+    // Options
+    IP_OPTION_INFORMATION opts; memset(&opts, 0, sizeof(opts));
+    if (ttl > 0 && ttl <= 255) opts.Ttl = (UCHAR)ttl;
+    if (df) opts.Flags = 0x02; // IP_FLAG_DF
+
+    // Reply buffer: ICMP_ECHO_REPLY + payload
+    DWORD replySize = sizeof(ICMP_ECHO_REPLY) + (DWORD)payload_len + 64;
+    char *replyBuf = (char*)malloc(replySize);
+    if (!replyBuf) { free(sendbuf); IcmpCloseHandle(hIcmp); return -1; }
+
+    for (int i = 0; i < count; i++) {
+        DWORD t0 = now_ms();
+        DWORD ret = IcmpSendEcho(hIcmp, sin->sin_addr.S_un.S_addr,
+                                 sendbuf, (WORD)payload_len,
+                                 &opts, replyBuf, replySize, timeout_ms);
+        DWORD t1 = now_ms();
+        samples[i].seq = i + 1;
+        samples[i].err = NULL;
+        if (ret == 0) {
+            DWORD gle = GetLastError();
+            samples[i].ok = false;
+            samples[i].ms = -1.0;
+            if (gle == IP_REQ_TIMED_OUT) samples[i].err = "timeout";
+            else if (gle == IP_BAD_DESTINATION) samples[i].err = "bad_destination";
+            else samples[i].err = "error";
+        } else {
+            PICMP_ECHO_REPLY rep = (PICMP_ECHO_REPLY)replyBuf;
+            // Some Windows versions provide RoundTripTime; but measure ourselves as fallback
+            double rtt = rep->RoundTripTime ? (double)rep->RoundTripTime : (double)(t1 - t0);
+            samples[i].ok = (rep->Status == IP_SUCCESS);
+            samples[i].ms = samples[i].ok ? clamp_zero(rtt) : -1.0;
+            if (!samples[i].ok) samples[i].err = "icmp_error";
+        }
+    }
+
+    free(replyBuf);
+    free(sendbuf);
+    IcmpCloseHandle(hIcmp);
+    return 0;
+}
+
+static int ping_ipv6(const struct sockaddr_in6 *sin6, int count, int timeout_ms, int ttl, int payload_len,
+                     ping_sample_t *samples) {
+#if _WIN32_WINNT >= 0x0600
+    HANDLE hIcmp6 = Icmp6CreateFile();
+    if (hIcmp6 == INVALID_HANDLE_VALUE) return -1;
+    if (payload_len < 0) payload_len = 32;
+    if (payload_len > 1400) payload_len = 1400;
+    char *sendbuf = (char*)malloc((size_t)payload_len);
+    if (!sendbuf) { IcmpCloseHandle(hIcmp6); return -1; }
+    memset(sendbuf, 'A', (size_t)payload_len);
+
+    DWORD replySize = sizeof(ICMPV6_ECHO_REPLY) + (DWORD)payload_len + 64;
+    char *replyBuf = (char*)malloc(replySize);
+    if (!replyBuf) { free(sendbuf); IcmpCloseHandle(hIcmp6); return -1; }
+
+    // Source addr unspecified, let stack choose
+    struct sockaddr_in6 src; memset(&src, 0, sizeof(src)); src.sin6_family = AF_INET6;
+
+    for (int i = 0; i < count; i++) {
+        DWORD t0 = now_ms();
+    DWORD ret = Icmp6SendEcho2(hIcmp6, NULL, NULL, NULL,
+                   (struct sockaddr_in6*)&src, (struct sockaddr_in6*)sin6,
+                   sendbuf, (WORD)payload_len,
+                   NULL, replyBuf, replySize, timeout_ms);
+        DWORD t1 = now_ms();
+        samples[i].seq = i + 1;
+        samples[i].err = NULL;
+        if (ret == 0) {
+            DWORD gle = GetLastError();
+            samples[i].ok = false;
+            samples[i].ms = -1.0;
+            if (gle == IP_REQ_TIMED_OUT) samples[i].err = "timeout";
+            else samples[i].err = "error";
+        } else {
+            PICMPV6_ECHO_REPLY rep6 = (PICMPV6_ECHO_REPLY)replyBuf;
+            // No RoundTripTime in struct for v6, measure by ourselves
+            double rtt = (double)(t1 - t0);
+            samples[i].ok = (rep6->Status == IP_SUCCESS);
+            samples[i].ms = samples[i].ok ? clamp_zero(rtt) : -1.0;
+            if (!samples[i].ok) samples[i].err = "icmp_error";
+        }
+    }
+
+    free(replyBuf);
+    free(sendbuf);
+    IcmpCloseHandle(hIcmp6);
+    return 0;
+#else
+    (void)sin6; (void)count; (void)timeout_ms; (void)ttl; (void)payload_len; (void)samples;
+    return -1;
+#endif
+}
+
+static void print_json_full(const char *target, int count, int timeout_ms, int ttl, int payload_len,
+                            const ping_sample_t *samples) {
+    int okc = 0; double sum = 0.0; int okcnt = 0;
+    for (int i = 0; i < count; i++) {
+        if (samples[i].ok && samples[i].ms >= 0) { sum += samples[i].ms; okc++; }
+        if (samples[i].ok) okcnt++;
+    }
+    double success_ratio = count > 0 ? ((double)okcnt) / (double)count : 0.0;
+    double avg_ms = okc > 0 ? (sum / (double)okc) : 0.0;
+
+    // Output JSON
+    printf("{\n");
+    printf("  \"target\": \"%s\",\n", target);
+    printf("  \"count\": %d, \"timeout_ms\": %d, \"ttl\": %d, \"len\": %d,\n", count, timeout_ms, ttl, payload_len);
+    printf("  \"data\": [\n");
+    for (int i = 0; i < count; i++) {
+        printf("    { \"seq\": %d, ", samples[i].seq);
+        if (samples[i].ms >= 0) {
+            printf("\"ms\": %.3f, ", samples[i].ms);
+        } else {
+            printf("\"ms\": null, ");
+        }
+        printf("\"ok\": %s", samples[i].ok ? "true" : "false");
+        if (samples[i].err) printf(", \"err\": \"%s\"", samples[i].err);
+        printf(" }%s\n", (i + 1 < count) ? "," : "");
+    }
+    printf("  ],\n");
+    printf("  \"summary\": { \"success_ratio\": %.4f, \"avg_ms\": %.3f }\n", success_ratio, avg_ms);
+    printf("}\n");
+}
+
+static void print_json_data_only(const char *target, int count, const ping_sample_t *samples) {
+    // compute summary
+    int okc = 0; double sum = 0.0; int okcnt = 0;
+    for (int i = 0; i < count; i++) {
+        if (samples[i].ok && samples[i].ms >= 0) { sum += samples[i].ms; okc++; }
+        if (samples[i].ok) okcnt++;
+    }
+    double success_ratio = count > 0 ? ((double)okcnt) / (double)count : 0.0;
+    double avg_ms = okc > 0 ? (sum / (double)okc) : 0.0;
+
+    // Array format matching aggplugin convention
+    printf("[\n");
+    for (int i = 0; i < count; i++) {
+        printf("  {\"target\":\"%s\",\"seq\":%d,", target, samples[i].seq);
+        if (samples[i].ms >= 0) {
+            printf("\"ms\":%.3f,", samples[i].ms);
+        } else {
+            printf("\"ms\":null,");
+        }
+        printf("\"ok\":%s", samples[i].ok ? "true" : "false");
+        if (samples[i].err) printf(",\"err\":\"%s\"", samples[i].err);
+        printf("},\n");
+    }
+    // Summary as final array element
+    printf("  {\"target\":\"%s\",\"type\":\"summary\",\"success_ratio\":%.4f,\"avg_ms\":%.3f}\n", target, success_ratio, avg_ms);
+    printf("]\n");
+}
+
+static void print_json_lld(const char *target, int count, const ping_sample_t *samples) {
+    // compute summary
+    int okc = 0; double sum = 0.0; int okcnt = 0;
+    for (int i = 0; i < count; i++) {
+        if (samples[i].ok && samples[i].ms >= 0) { sum += samples[i].ms; okc++; }
+        if (samples[i].ok) okcnt++;
+    }
+    double success_ratio = count > 0 ? ((double)okcnt) / (double)count : 0.0;
+    double avg_ms = okc > 0 ? (sum / (double)okc) : 0.0;
+
+    // LLD format with discovery macros
+    printf("[\n");
+    for (int i = 0; i < count; i++) {
+        printf("  {\"{#TARGET}\":\"%s\",\"{#SEQ}\":%d,", target, samples[i].seq);
+        if (samples[i].ms >= 0) {
+            printf("\"{#MS}\":%.3f,", samples[i].ms);
+        } else {
+            printf("\"{#MS}\":null,");
+        }
+        printf("\"{#OK}\":%s", samples[i].ok ? "1" : "0");
+        if (samples[i].err) printf(",\"{#ERR}\":\"%s\"", samples[i].err);
+        printf("},\n");
+    }
+    // Summary as final array element with macros
+    printf("  {\"{#TARGET}\":\"%s\",\"{#TYPE}\":\"summary\",\"{#SUCCESS_RATIO}\":%.4f,\"{#AVG_MS}\":%.3f}\n", target, success_ratio, avg_ms);
+    printf("]\n");
+}
+
+int main(int argc, char **argv) {
+    // Defaults
+    const char *target = NULL;
+    int count = 3;
+    int timeout_ms = 1000;
+    int ttl = 64;
+    int payload_len = 32;
+    bool df = false;
+    bool ipv6 = false;
+    output_mode_t out_mode = OUTPUT_DATA_ONLY;  // Default to array format (Zabbix-compatible)
+
+    // Parse argv
+    for (int i = 1; i < argc; i++) {
+        if (_stricmp(argv[i], "-target") == 0 && i + 1 < argc) { target = argv[++i]; }
+        else if (_stricmp(argv[i], "-count") == 0 && i + 1 < argc) { count = parse_int(argv[++i], count); }
+        else if (_stricmp(argv[i], "-timeout") == 0 && i + 1 < argc) { timeout_ms = parse_int(argv[++i], timeout_ms); }
+        else if (_stricmp(argv[i], "-ttl") == 0 && i + 1 < argc) { ttl = parse_int(argv[++i], ttl); }
+        else if (_stricmp(argv[i], "-len") == 0 && i + 1 < argc) { payload_len = parse_int(argv[++i], payload_len); }
+        else if (_stricmp(argv[i], "-df") == 0 && i + 1 < argc) { df = parse_bool01(argv[++i], df); }
+        else if (_stricmp(argv[i], "-ipv6") == 0 && i + 1 < argc) { ipv6 = parse_bool01(argv[++i], ipv6); }
+        else if (_stricmp(argv[i], "-output") == 0 && i + 1 < argc) {
+            const char *m = argv[++i];
+            if (_stricmp(m, "full") == 0) out_mode = OUTPUT_FULL;
+            else if (_stricmp(m, "data") == 0 || _stricmp(m, "data-only") == 0) out_mode = OUTPUT_DATA_ONLY;
+            else if (_stricmp(m, "lld") == 0) out_mode = OUTPUT_LLD;
+        }
+        else if (_stricmp(argv[i], "-h") == 0 || _stricmp(argv[i], "--help") == 0) { print_usage(); return 2; }
+    }
+
+    if (!target || count <= 0 || count > 100) { print_usage(); return 2; }
+
+    // Init Winsock for name resolution
+    WSADATA wsa; if (WSAStartup(MAKEWORD(2,2), &wsa) != 0) { fprintf(stderr, "WSAStartup failed\n"); return 1; }
+
+    struct addrinfo *ai = NULL; int fam = resolve_host(target, ipv6, &ai);
+    if (fam == AF_UNSPEC || !ai) { WSACleanup(); fprintf(stderr, "resolve failed\n"); return 1; }
+
+    ping_sample_t *samples = (ping_sample_t*)calloc((size_t)count, sizeof(ping_sample_t));
+    if (!samples) { freeaddrinfo(ai); WSACleanup(); return 1; }
+
+    int rc = -1;
+    if (ai->ai_family == AF_INET) {
+        struct sockaddr_in *sin = (struct sockaddr_in*)ai->ai_addr;
+        rc = ping_ipv4(sin, count, timeout_ms, ttl, payload_len, df, samples);
+    } else if (ai->ai_family == AF_INET6) {
+        struct sockaddr_in6 *sin6 = (struct sockaddr_in6*)ai->ai_addr;
+        rc = ping_ipv6(sin6, count, timeout_ms, ttl, payload_len, samples);
+    }
+
+    if (rc != 0) {
+        // Fallback: if v6 failed and not forced, try v4
+        if (ai->ai_family == AF_INET6 && !ipv6) {
+            freeaddrinfo(ai);
+            ai = NULL; fam = resolve_host(target, false, &ai);
+            if (ai && ai->ai_family == AF_INET) {
+                struct sockaddr_in *sin = (struct sockaddr_in*)ai->ai_addr;
+                rc = ping_ipv4(sin, count, timeout_ms, ttl, payload_len, df, samples);
+            }
+        }
+    }
+
+    if (rc != 0) { free(samples); if (ai) freeaddrinfo(ai); WSACleanup(); fprintf(stderr, "ping failed\n"); return 1; }
+
+    switch (out_mode) {
+        case OUTPUT_LLD:        print_json_lld(target, count, samples); break;
+        case OUTPUT_DATA_ONLY:  print_json_data_only(target, count, samples); break;
+        case OUTPUT_FULL:
+        default:                print_json_full(target, count, timeout_ms, ttl, payload_len, samples); break;
+    }
+
+    free(samples);
+    if (ai) freeaddrinfo(ai);
+    WSACleanup();
+    return 0;
+}

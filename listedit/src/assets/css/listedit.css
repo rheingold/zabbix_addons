@@ -1,0 +1,95 @@
+/**
+ * ============================================================================
+ * File: listedit.css
+ * Created: 2025-12-02
+ *
+ * Lead & Architecture: lukas@plachy.eu
+ * Development: Claude Sonnet 4 (AI Assistant, Anthropic)
+ *
+ * License: MIT (unless specified otherwise in project root)
+ * ============================================================================
+ *
+ * PURPOSE:
+ * Styles for Macro List Editor
+ */
+
+.macro-list-wrapper {
+    max-width: 1200px;
+}
+
+.macro-item {
+    background: #fff;
+    border-radius: 4px;
+}
+
+.macro-item h3 {
+    margin: 0 0 10px 0;
+    color: #333;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.list-table {
+    font-size: 13px;
+}
+
+.list-table input.cell-input {
+    font-size: 12px;
+}
+
+.list-table input.cell-input:focus {
+    outline: 2px solid #4285f4;
+}
+
+.btn-add-row,
+.btn-save,
+.btn-init-pipe,
+.btn-init-json {
+    padding: 6px 12px;
+    margin-right: 8px;
+    background: #0275d8;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.btn-add-row:hover,
+.btn-save:hover,
+.btn-init-pipe:hover,
+.btn-init-json:hover {
+    background: #025aa5;
+}
+
+.btn-link {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 0;
+}
+
+.btn-link:hover {
+    opacity: 0.7;
+}
+
+.format-info {
+    font-style: italic;
+}
+
+.msg-info {
+    padding: 15px;
+    background: #d9edf7;
+    border: 1px solid #bce8f1;
+    border-radius: 4px;
+    color: #31708f;
+}
+
+.empty-editor {
+    padding: 20px;
+    text-align: center;
+    background: #f9f9f9;
+    border: 1px dashed #ccc;
+    border-radius: 4px;
+}
