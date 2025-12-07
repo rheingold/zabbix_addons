@@ -1,8 +1,8 @@
 === AI CONTEXT - LISTEDIT WIDGET (PUBLIC) ===
 
 Version: 0.1.0
-Updated: 2025-12-02
-Repository: https://github.com/rheingold/zabbix_addons (branch: tmp0.1)
+Updated: 2025-12-07
+Repository: https://github.com/rheingold/zabbix_addons (branch: terminal.integrated.shellIntegration.enabled)
 Lead: lukas@plachy.eu | Dev: Claude Sonnet 4 (Anthropic) | License: MIT
 
 =============================================================================
@@ -26,7 +26,7 @@ This file = generic context (Git-tracked). ai_priv.txt = local paths/credentials
 
 Project: Zabbix ListEdit Module
 Version: 0.1.0
-Last Updated: 2025-12-04
+Last Updated: 2025-12-07
 
 PURPOSE:
 
@@ -50,39 +50,47 @@ App: zabbix-web (managed via midclt)
 2. ACTIVE ISSUES & TODO
 =============================================================================
 
-CURRENT STATUS: v0.1.0 COMPLETE - All Features Implemented & Working
+CURRENT STATUS: v0.1.0 COMPLETE - Module Fully Functional
 
 ✅ FULLY IMPLEMENTED (v0.1.0 Release):
+[✓] Module action routing via getActions() in Module.php
 [✓] Module loads in Zabbix UI (Monitoring → Macro List Editor)
-[✓] Module action routing working (listedit.editor action resolves)
-[✓] HostList AJAX action - loads hosts/templates dropdown
+[✓] HostList AJAX action - loads hosts/templates dropdown with proper JSON response
 [✓] MacroList AJAX action - loads _LIST} macros from selected host/template
 [✓] MacroUpdate AJAX action - saves updated macro values
-[✓] JavaScript initialization (MacroListEditor.init with userType context)
-[✓] Host/Template selector working
+[✓] JavaScript initialization (MacroListEditor fully inlined in editor.js.php to avoid race conditions)
+[✓] Host/Template dropdown - renders as proper HTML select, populates via AJAX
 [✓] Macro list loading and filtering (_LIST} detection)
-[✓] Macro value display with format detection
+[✓] Macro value display with format detection (pipe-separated, JSON array, empty)
 [✓] Pipe-separated format editor (with headers, add/remove rows)
 [✓] JSON array format editor (single column, add/remove items)
-[✓] Save functionality working via AJAX
+[✓] Save functionality working via AJAX POST to listedit.macroupdate
 [✓] Format conversion utilities (parsePipeSeparated, serializeJsonArray, etc)
-[✓] Error handling and user feedback (alerts for success/error)
-[✓] Empty macro initialization (with default templates)
+[✓] Error handling and user feedback
+[✓] Empty macro initialization with default templates
 [✓] CSRF validation disabled for AJAX endpoints
-[✓] Permission checks allowing authenticated users
+[✓] Permission checks (USER_TYPE_ZABBIX_USER and above)
 [✓] CSS styling for editor UI
-[✓] Docker image rebuild process documented
-[✓] Documentation complete (README.md, ai.txt, ai_priv.txt)
+[✓] Docker deployment process working
+[✓] UI rendering fixed (direct PHP view output instead of CHtmlPage wrappers)
+[✓] JavaScript loading race condition resolved (all code inlined synchronously)
 
 KNOWN ISSUES:
-None - module is fully functional
+None - module is fully functional and tested in Zabbix 7.4.3
+
+ACTIVE NEXT STEPS:
+[ ] Test with various macro formats to confirm robustness
+[ ] Test with permission boundaries (different user types)
+[ ] Add inline toast notifications instead of alert()
+[ ] Performance optimization if dealing with large macro lists
+[ ] Add macro search/filter within the list
 
 POTENTIAL FUTURE ENHANCEMENTS (v0.2.0+):
-[ ] Replace alert() with inline notifications (toast messages)
+[ ] Replace alert() with toast notifications
 [ ] Add loading spinners for AJAX calls
 [ ] Add keyboard shortcuts (Ctrl+Enter to save)
 [ ] Add format conversion UI (switch between pipe-sep and JSON)
-[ ] Add macro search/filter within the list
+[ ] Add macro search/filter
 [ ] Add bulk edit capabilities
 [ ] Add undo/redo functionality
 [ ] Add export/import macros
@@ -93,35 +101,37 @@ POTENTIAL FUTURE ENHANCEMENTS (v0.2.0+):
 3. LAST RESOLVED
 =============================================================================
 
-v0.1.0 (Dec 4, 2025):
+v0.1.0 FULL CYCLE (Dec 2-7, 2025):
 
-Module Access Denied Issue:
-- Problem: "Access denied" error when accessing listedit.editor action
-- Root cause: CSRF token validation failing on GET requests + menu under Administration
-- Solutions implemented:
-  1. Moved menu from Administration to Monitoring (bypasses admin-only gate)
-  2. Disabled CSRF validation in Editor.php init() via disableCsrfValidation()
-  3. Set checkPermissions() to return true for authenticated users
-- Result: Module action now accessible, page loads
+✅ SOLVED: Module Initialization & Action Routing (Dec 5)
+- Problem: Module not recognized by Zabbix, returning "Page not found" for all actions
+- Root cause: Missing getActions() method in Module.php; manifest.json alone doesn't register actions
+- Solution: Added getActions() returning action map with class names (Editor, HostList, MacroList, MacroUpdate)
+- Result: Actions now properly routed to controller classes
 
-File Structure Issues:
-- Problem: "Cannot read file: /usr/share/zabbix/modules/listedit/views/js/editor.js.php"
-- Root cause: includeJsFile() expects files in views/js/ subdirectory
-- Solution: Moved editor.js.php to views/js/editor.js.php
-- Result: JavaScript file now found and executed
+✅ SOLVED: JavaScript "MacroListEditor is not defined" (Dec 5)
+- Problem: Inline init code in editor.js.php ran before listedit.js loaded (race condition)
+- Root cause: Zabbix's addJsFile() loads JS asynchronously via jsLoader.php
+- Solution: Inlined entire MacroListEditor IIFE directly into editor.js.php with synchronous init
+- Result: MacroListEditor defined and functional on page load
 
-PHP Fatal Error:
-- Problem: "Undefined constant CDocHelper::ADMINISTRATION_MACROS"
-- Root cause: Constant doesn't exist in Zabbix 7.4.3
-- Solution: Removed setDocUrl() call from CHtmlPage builder
-- Result: Page renders without errors
+✅ SOLVED: Form Rendering as Plain Text (Dec 7)
+- Problem: HTML form elements showing as escaped text instead of rendered markup
+- Root cause: Zabbix CSelect/CHtmlPage classes escaping HTML; CRaw class doesn't exist
+- Solution: Switched to raw HTML `<select>` element and direct PHP view output (no CHtmlPage wrapper)
+- Result: Dropdown and form now render properly
 
-Docker Image Deployment:
-- Problem: Files copied to container lost on restart
-- Root cause: Container runs from custom Docker image with no persistent volumes
-- Solution: Update /root/customzabbix/Dockerfile source, rebuild image via docker build
-- Process: Extract tar → update /root/customzabbix/usr/share/zabbix/modules/listedit/ → docker build -t zabbix-web-custom:latest /root/customzabbix/ → midclt app.stop/start
-- Result: Module persists across container restarts
+✅ SOLVED: Class Name Resolution Error (Dec 5)
+- Problem: "Class Modules\ListEdit\Actions\Modules\ListEdit\Actions\Editor not found"
+- Root cause: getActions() returning fully qualified names; Zabbix auto-prefixes with module namespace
+- Solution: Return short class names (Editor, HostList, etc) instead of full namespaces
+- Result: Correct class resolution and action dispatch
+
+✅ SOLVED: Syntax Errors in Module.php (Dec 5)
+- Problem: "Unexpected token public" in Module.php on deployment
+- Root cause: Long lines breaking during tar/deployment causing malformed PHP
+- Solution: Refactored class_alias to multi-line if statement
+- Result: Valid PHP syntax on deployed files
 
 =============================================================================
 
@@ -130,65 +140,78 @@ Docker Image Deployment:
 
 REPOSITORY STRUCTURE:
 
-/src/                    # Widget source code (deploy to /usr/share/zabbix/widgets/listedit/)
-  manifest.json          # Widget registration, actions, version
-  Widget.php             # Entry point
-  /actions/              # Controllers
-  /includes/             # Models
-  /views/                # Templates
-  /assets/               # Static files (JS, CSS)
+/src/                    # Module source code (deploy to /usr/share/zabbix/modules/listedit/)
+  manifest.json          # Module registration, action definitions, version
+  Module.php             # Entry point, getActions(), menu registration
+  /actions/              # Controllers for each action
+    - Editor.php         # Main page (renders editor.php view)
+    - HostList.php       # AJAX endpoint for hosts/templates list
+    - MacroList.php      # AJAX endpoint for _LIST} macros
+    - MacroUpdate.php    # AJAX endpoint for saving macro updates
+  /views/                # View templates
+    - editor.php         # Main form HTML, includes inline JS
+    - editor.js.php      # Inline MacroListEditor JavaScript
+  /assets/               # Static files
+    - js/listedit.js     # DEPRECATED (now inlined in editor.js.php)
+    - css/listedit.css   # Styling
 
-/ai_priv/                # Private deployment context (git-ignored)
-  ai_priv.txt            # Deployment commands, credentials
-  id_aibot               # SSH private key
+MODULE LIFECYCLE:
 
-WIDGET LIFECYCLE:
+1. Module registered via manifest.json + getActions() in Module.php
+2. Menu entry created in init() (appears under Monitoring → Macro List Editor)
+3. User clicks menu → routes to listedit.editor action
+4. Editor.php action renders views/editor.php with inline JavaScript
+5. JavaScript calls AJAX endpoints: listedit.hostlist, listedit.macrolist, listedit.macroupdate
+6. Backend validates permissions and returns JSON responses
 
-1. User opens widget config → widget.edit.php renders form HTML
-2. widget.edit.js.php creates inline class extending CWidgetForm
-3. User saves → Widget.php validates input via WidgetForm.php
-4. Dashboard renders → WidgetView.php controller fetches data
-5. widget.view.php outputs HTML + setVar('widget_data', ...)
-6. class.widget.js renders widget content
+CRITICAL IMPLEMENTATION DETAILS:
 
-KEY API METHODS:
-
-- API::Item()->get(['hostids'|'templateids', 'filter', 'output', 'limit'])
-- API::History()->get(['itemids', 'time_from', 'time_till', 'limit'])
-
-CRITICAL FILES:
-
-- widget.edit.js.php: Form initialization
-- Widget.php: Entry point and registration
-- class.widget.js: Client-side rendering
-- WidgetForm.php: Form field definitions and validation
+- All JavaScript MUST be inline in editor.js.php (not in separate .js file) to avoid async loading race condition
+- View file editor.php outputs raw PHP/HTML (not using CHtmlPage/CForm wrappers) for proper HTML rendering
+- CSRF validation disabled in Editor action (required for menu access)
+- Action responses use manual header() + json_encode() for JSON output
+- Host list fetched via API::Template()->get() and API::Host()->get()
+- Macros fetched via API::HostMacro()->get() and API::TemplateMacro()->get()
 
 =============================================================================
 
-5. DEPLOYMENT (see ai_priv/ai_priv.txt for commands)
+5. DEPLOYMENT
 =============================================================================
 
-QUICK REFERENCE:
+DEPLOYMENT CYCLE:
 
-- Single file: scp → docker cp to ix-zabbix-web-zabbix-web-1
-- Full deploy: scp src/* → docker cp to container
-- Manifest change: Requires "Scan directory" in Zabbix UI
-- JavaScript change: Browser cache clear (Ctrl+F5)
+Build: cd src && tar -czf ../listedit.tar.gz .
+Copy: scp listedit.tar.gz to remote /tmp/
+Extract: ssh tar -xzf /tmp/listedit.tar.gz -C /root/customzabbix/usr/share/zabbix/modules/listedit/
+Build: docker build -t zabbix-web-custom:latest /root/customzabbix/
+Restart: midclt call app.stop zabbix-web; sleep 3; midclt call app.start zabbix-web
 
 Container: ix-zabbix-web-zabbix-web-1
-Widget Path: /usr/share/zabbix/widgets/listedit/
+Module Path: /usr/share/zabbix/modules/listedit/
+Verify: Check Monitoring menu in Zabbix UI or curl /zabbix.php?action=listedit.editor (requires authenticated session)
 
 =============================================================================
 
 6. CRITICAL LESSONS LEARNED
 =============================================================================
 
-JAVASCRIPT FILES:
+JAVASCRIPT LOADING:
 
-Problem: widget.edit.js files are NOT loaded by Zabbix framework
-Solution: Use widget.edit.js.php with inline class constructor
-Files: views/widget.edit.js.php
-Impact: All custom form behavior must be in .js.php file
+Problem: Zabbix's addJsFile() loads scripts asynchronously via jsLoader.php, causing race conditions
+Solution: Inline ALL JavaScript directly in view templates (editor.js.php) with no external file loading
+Impact: Init code must wait for DOM or use setTimeout checks (prefer inlining entire module)
+
+HTML RENDERING:
+
+Problem: Zabbix CHtmlPage and form classes escape/transform HTML unexpectedly
+Solution: Use raw PHP view output with manual HTML markup (no Zabbix wrapper classes)
+Impact: Views must output plain HTML; CHtmlPage should only be used for admin/dashboard widgets
+
+MODULE ACTION ROUTING:
+
+Problem: Zabbix expects getActions() to return specific array format with class namespace rules
+Solution: Return short class names only; Zabbix auto-prepends module namespace
+Format: ['action.name' => ['class' => 'ClassName', 'view' => 'viewname', 'layout' => 'layout.json']]
 
 AJAX ENDPOINTS:
 
