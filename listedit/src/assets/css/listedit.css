@@ -14,14 +14,15 @@
  * Styles for Macro List Editor with theme-aware colors and smooth transitions
  */
 
-/* Use CSS variables that match Zabbix theme */
+/* CSS variables with proper contrast for light/dark themes */
 :root {
-    --mle-bg-primary: rgba(255, 255, 255, 0.95);
-    --mle-bg-secondary: rgba(240, 240, 240, 0.5);
-    --mle-bg-hover: rgba(245, 245, 245, 0.8);
-    --mle-text-primary: #333;
-    --mle-text-secondary: #666;
-    --mle-border: rgba(200, 200, 200, 0.3);
+    /* Light theme (default) */
+    --mle-bg-primary: #ffffff;
+    --mle-bg-secondary: #f5f5f5;
+    --mle-bg-hover: #e8f4f8;
+    --mle-text-primary: #333333;
+    --mle-text-secondary: #666666;
+    --mle-border: #cccccc;
     --mle-accent: #0275d8;
     --mle-accent-hover: #025aa5;
     --mle-success: #27ae60;
@@ -32,14 +33,15 @@
 /* Dark theme support */
 @media (prefers-color-scheme: dark) {
     :root {
-        --mle-bg-primary: rgba(40, 40, 40, 0.9);
-        --mle-bg-secondary: rgba(50, 50, 50, 0.5);
-        --mle-bg-hover: rgba(60, 60, 60, 0.7);
-        --mle-text-primary: #e0e0e0;
-        --mle-text-secondary: #b0b0b0;
-        --mle-border: rgba(100, 100, 100, 0.3);
-        --mle-accent: #4a9eff;
-        --mle-accent-hover: #2980ff;
+        /* Dark theme - solid backgrounds, high contrast text */
+        --mle-bg-primary: #2b2b2b;
+        --mle-bg-secondary: #3d3d3d;
+        --mle-bg-hover: #4a4a4a;
+        --mle-text-primary: #e8e8e8;
+        --mle-text-secondary: #b8b8b8;
+        --mle-border: #555555;
+        --mle-accent: #5ca3ff;
+        --mle-accent-hover: #3d8fff;
     }
 }
 
@@ -83,6 +85,21 @@
     cursor: pointer;
 }
 
+.selection-panel {
+    background: var(--mle-bg-primary);
+    border: 1px solid var(--mle-border);
+    border-radius: 4px;
+    padding: 15px;
+    margin-bottom: 20px;
+    color: var(--mle-text-primary);
+}
+
+.selection-panel h3 {
+    margin-top: 0;
+    color: var(--mle-text-primary);
+    font-size: 16px;
+}
+
 .host-search-dialog {
     display: none;
     position: fixed;
@@ -90,11 +107,11 @@
     left: 50%;
     transform: translate(-50%, -50%);
     background: var(--mle-bg-primary);
-    border: 1px solid var(--mle-border);
+    border: 2px solid var(--mle-border);
     border-radius: 6px;
     padding: 20px;
     z-index: 1000;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
     max-width: 500px;
     width: 90%;
     max-height: 80vh;
@@ -108,33 +125,62 @@
 .host-search-dialog h2 {
     margin-top: 0;
     color: var(--mle-text-primary);
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.host-search-dialog h3 {
+    color: var(--mle-text-primary);
+    margin-top: 15px;
 }
 
 .host-search-input {
     width: 100%;
-    padding: 10px;
+    padding: 12px;
     border: 1px solid var(--mle-border);
     border-radius: 3px;
     margin-bottom: 15px;
     box-sizing: border-box;
     color: var(--mle-text-primary);
     background: var(--mle-bg-secondary);
+    font-size: 14px;
+}
+
+.host-search-input:focus {
+    outline: none;
+    border-color: var(--mle-accent);
+    box-shadow: 0 0 3px var(--mle-accent);
 }
 
 .host-search-results {
     max-height: 400px;
     overflow-y: auto;
+    border: 1px solid var(--mle-border);
+    border-radius: 3px;
+    background: var(--mle-bg-secondary);
 }
 
 .host-search-item {
-    padding: 10px;
+    padding: 12px;
     border-bottom: 1px solid var(--mle-border);
     cursor: pointer;
     transition: background 0.15s ease;
+    color: var(--mle-text-primary);
+}
+
+.host-search-item:last-child {
+    border-bottom: none;
 }
 
 .host-search-item:hover {
     background: var(--mle-bg-hover);
+    color: var(--mle-text-primary);
+}
+
+.host-search-item.selected {
+    background: var(--mle-accent);
+    color: #ffffff;
+    font-weight: 600;
 }
 
 .host-search-overlay {
@@ -331,10 +377,10 @@
 
 .msg-info {
     padding: 15px;
-    background: rgba(52, 152, 219, 0.1);
+    background: var(--mle-bg-secondary);
     border: 1px solid var(--mle-info);
     border-radius: 4px;
-    color: var(--mle-info);
+    color: var(--mle-text-primary);
 }
 
 .empty-editor {
@@ -399,11 +445,11 @@
     left: 50%;
     transform: translate(-50%, -50%);
     background: var(--mle-bg-primary);
-    border: 1px solid var(--mle-border);
+    border: 2px solid var(--mle-border);
     border-radius: 6px;
     padding: 20px;
     z-index: 1001;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
     max-width: 500px;
     width: 90%;
 }
@@ -458,3 +504,108 @@
 .column-item button:hover {
     background: #c0392b;
 }
+
+/* Dialog components */
+.dialog-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    border-bottom: 1px solid var(--mle-border);
+    padding-bottom: 10px;
+}
+
+.dialog-header h3 {
+    margin: 0;
+    color: var(--mle-text-primary);
+    font-size: 16px;
+}
+
+.dialog-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 20px;
+    color: var(--mle-text-secondary);
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s ease;
+}
+
+.dialog-close:hover {
+    color: var(--mle-text-primary);
+}
+
+.dialog-body {
+    margin-bottom: 15px;
+    color: var(--mle-text-primary);
+}
+
+.dialog-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    border-top: 1px solid var(--mle-border);
+    padding-top: 15px;
+}
+
+.btn-primary,
+.btn-secondary {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.15s ease;
+}
+
+.btn-primary {
+    background: var(--mle-accent);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: var(--mle-accent-hover);
+    transform: translateY(-2px);
+}
+
+.btn-secondary {
+    background: var(--mle-bg-secondary);
+    color: var(--mle-text-primary);
+    border: 1px solid var(--mle-border);
+}
+
+.btn-secondary:hover {
+    background: var(--mle-bg-hover);
+}
+
+/* Macro editor container */
+.macro-editor {
+    background: var(--mle-bg-primary);
+    border: 1px solid var(--mle-border);
+    border-radius: 4px;
+    padding: 15px;
+    margin-bottom: 20px;
+    color: var(--mle-text-primary);
+}
+
+.macro-editor h4 {
+    margin-top: 0;
+    color: var(--mle-text-primary);
+}
+
+.macro-editor p {
+    color: var(--mle-text-secondary);
+    margin: 5px 0;
+}
+
+.macro-header {
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--mle-border);
+}
+
