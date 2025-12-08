@@ -531,6 +531,10 @@ body {
     width: 90%;
     max-height: 80vh;
     overflow-y: auto;
+    background: transparent;
+    border: 1px solid;
+    border-color: inherit;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 #column-editor-dialog.active {
