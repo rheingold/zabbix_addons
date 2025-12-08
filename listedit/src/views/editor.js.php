@@ -356,7 +356,7 @@ var MacroListEditor = (function() {
         html += '</table>';
         
         if (config.canEdit) {
-            html += '<div style="margin-top: 10px;">';
+            html += '<div style="margin-top: 10px; display: flex; align-items: center; gap: 8px;">';
             html += '<button type="button" class="btn-row-add" data-macroid="' + macroId + '">+ Add Row</button> ';
             html += '<button type="button" class="btn-col-edit" data-macroid="' + macroId + '">Edit Columns</button> ';
             html += '<button type="button" class="btn-save" data-macroid="' + macroId + '">Save Changes</button>';
@@ -442,6 +442,9 @@ var MacroListEditor = (function() {
             // If column editor is open, refresh it to match toggle
             var dialog = jQuery('#column-editor-dialog');
             if (dialog.hasClass('active')) {
+                // Update the stored toggle state
+                dialog.data('display-toggle', checked);
+                
                 var cols = dialog.find('#column-editor-columns');
                 cols.find('input').each(function() {
                     var input = jQuery(this);
@@ -621,7 +624,7 @@ var MacroListEditor = (function() {
             cols.append(item);
         });
         
-        dialog.addClass('active').data('editor', editor);
+        dialog.addClass('active').data('editor', editor).data('display-toggle', displayToggle);
         jQuery('#column-editor-overlay').addClass('active');
     }
     
