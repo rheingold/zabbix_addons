@@ -676,13 +676,13 @@ body {
 }
 
 .btn-secondary {
-    background: var(--mle-bg-secondary);
-    color: var(--mle-text-primary);
-    border: 1px solid var(--mle-border);
+    background: #f0f0f0;
+    color: #333;
+    border: 1px solid #ccc;
 }
 
 .btn-secondary:hover {
-    background: var(--mle-bg-hover);
+    background: #e0e0e0;
     border-color: var(--mle-accent);
 }
 
