@@ -14,43 +14,14 @@
  * Styles for Macro List Editor with theme-aware colors and smooth transitions
  */
 
-/* CSS variables - match Zabbix 7.4 theme colors */
+/* CSS variables - inherit from Zabbix theme, no overrides */
 :root {
-    /* Light theme - Zabbix default */
-    --mle-bg-primary: #ffffff;
-    --mle-bg-secondary: #f5f5f5;
-    --mle-text-primary: #333333;
-    --mle-text-secondary: #666666;
-    --mle-border: #cccccc;
-    --mle-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
-    --mle-shadow-hover: 0 4px 8px rgba(0, 0, 0, 0.12);
-    --mle-bg-hover: #f0f5ff;
-    
-    /* Accent colors */
+    /* Only define accent colors specific to this module */
     --mle-accent: #0275d8;
     --mle-accent-hover: #025aa5;
     --mle-success: #27ae60;
     --mle-danger: #e74c3c;
     --mle-info: #3498db;
-}
-
-/* Dark theme - when Zabbix uses dark mode (class: .sidebar-nav-dark or body.dark-theme) */
-body.sidebar-nav-dark,
-body.dark-theme,
-body[data-zabbix-theme="dark"],
-body[data-zabbix-theme="dark-theme"],
-html.dark-theme,
-html.sidebar-nav-dark {
-    --mle-bg-primary: #2b2b2b;
-    --mle-bg-secondary: #3f3f3f;
-    --mle-text-primary: #e0e0e0;
-    --mle-text-secondary: #b0b0b0;
-    --mle-border: #555555;
-    --mle-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-    --mle-shadow-hover: 0 4px 8px rgba(0, 0, 0, 0.4);
-    --mle-bg-hover: #454545;
-    --mle-accent: #5ca3ff;
-    --mle-accent-hover: #3d8fff;
 }
 
 /* Apply theme to page and editor */
@@ -133,11 +104,12 @@ body {
 .selection-panel {
     flex: 1;
     min-width: 350px;
-    background: var(--mle-bg-primary);
-    border: 1px solid var(--mle-border);
+    background: transparent;
+    border: 1px solid;
+    border-color: inherit;
     border-radius: 8px;
     padding: 16px;
-    color: var(--mle-text-primary);
+    box-shadow: none;
     box-shadow: var(--mle-shadow);
     transition: all 0.2s ease;
 }
@@ -191,10 +163,10 @@ body {
 #macro-selector {
     flex: 1 1 300px;
     padding: 10px 12px;
-    border: 1px solid var(--mle-border);
+    border: 1px solid;
+    border-color: inherit;
     border-radius: 6px;
-    background: var(--mle-bg-secondary);
-    color: var(--mle-text-primary);
+    background: transparent;
     font-size: 13px;
     cursor: pointer;
     transition: all 0.15s ease;
@@ -221,17 +193,9 @@ body {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    background: var(--mle-bg-primary);
-    border: 1px solid var(--mle-border);
-    border-radius: 12px;
-    padding: 32px;
-    z-index: 1000;
-    box-shadow: 0 20px 25px rgba(0, 0, 0, 0.15);
-    max-width: 500px;
-    width: 90%;
-    max-height: 80vh;
-    overflow-y: auto;
-    color: var(--mle-text-primary);
+    background: transparent;
+    border: 1px solid;
+    border-color: inherit;
 }
 
 .host-search-dialog.active {
@@ -253,12 +217,12 @@ body {
 .host-search-input {
     width: 100%;
     padding: 12px;
-    border: 1px solid var(--mle-border);
+    border: 1px solid;
+    border-color: inherit;
     border-radius: 3px;
     margin-bottom: 15px;
     box-sizing: border-box;
-    color: var(--mle-text-primary);
-    background: var(--mle-bg-secondary);
+    background: transparent;
     font-size: 14px;
 }
 
@@ -271,9 +235,10 @@ body {
 .host-search-results {
     max-height: 400px;
     overflow-y: auto;
-    border: 1px solid var(--mle-border);
+    border: 1px solid;
+    border-color: inherit;
     border-radius: 3px;
-    background: var(--mle-bg-secondary);
+    background: transparent;
 }
 
 .host-search-item {
@@ -318,7 +283,7 @@ body {
     font-size: 14px;
     width: 100%;
     border-collapse: collapse;
-    background: var(--mle-bg-primary);
+    background: transparent;
 }
 
 .list-table tr {
@@ -357,15 +322,16 @@ body {
 }
 
 .list-table thead {
-    background: var(--mle-bg-secondary);
-    border-bottom: 2px solid var(--mle-border);
+    background: transparent;
+    border-bottom: 2px solid;
+    border-color: inherit;
 }
 
 .list-table th {
     padding: 14px;
     text-align: left;
-    color: var(--mle-text-primary);
     font-weight: 600;
+    cursor: pointer;
     cursor: pointer;
     user-select: none;
     transition: background 0.15s ease;
@@ -378,8 +344,8 @@ body {
 
 .list-table td {
     padding: 12px 14px;
-    border-bottom: 1px solid var(--mle-border);
-    color: var(--mle-text-primary);
+    border-bottom: 1px solid;
+    border-color: inherit;
 }
 
 .list-table tbody tr:hover {
@@ -391,8 +357,8 @@ body {
     padding: 10px;
     border: 1px solid var(--mle-accent);
     border-radius: 6px;
-    background: var(--mle-bg-secondary);
-    color: var(--mle-text-primary);
+    background: transparent;
+    width: 100%;
     width: 100%;
     box-sizing: border-box;
     transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
@@ -401,7 +367,7 @@ body {
 .list-table input.cell-input:focus {
     outline: none;
     border-color: var(--mle-accent);
-    background: var(--mle-bg-primary);
+    background: transparent;
     box-shadow: 0 0 0 3px rgba(2, 117, 216, 0.1);
 }
 
@@ -509,8 +475,9 @@ body {
 .empty-editor {
     padding: 20px;
     text-align: center;
-    background: var(--mle-bg-secondary);
-    border: 1px dashed var(--mle-border);
+    background: transparent;
+    border: 1px dashed;
+    border-color: inherit;
     border-radius: 4px;
     color: var(--mle-text-secondary);
 }
@@ -519,8 +486,9 @@ body {
 .bulk-editor-panel {
     margin-top: 20px;
     padding: 15px;
-    background: var(--mle-bg-secondary);
-    border: 1px solid var(--mle-border);
+    background: transparent;
+    border: 1px solid;
+    border-color: inherit;
     border-radius: 4px;
     transition: all 0.2s ease;
 }
@@ -546,12 +514,12 @@ body {
     height: 50px;
     max-width: 600px;
     padding: 8px;
-    border: 1px solid var(--mle-border);
+    border: 1px solid;
+    border-color: inherit;
     border-radius: 6px;
     font-family: monospace;
     font-size: 12px;
-    background: var(--mle-bg-primary);
-    color: var(--mle-text-primary);
+    background: transparent;
     box-sizing: border-box;
     margin-top: 10px;
     transition: all 0.15s ease;
@@ -570,8 +538,9 @@ body {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    background: var(--mle-bg-primary);
-    border: 2px solid var(--mle-border);
+    background: transparent;
+    border: 2px solid;
+    border-color: inherit;
     border-radius: 6px;
     padding: 20px;
     z-index: 1001;
@@ -612,10 +581,10 @@ body {
 .column-item input {
     flex: 1;
     padding: 8px;
-    border: 1px solid var(--mle-border);
+    border: 1px solid;
+    border-color: inherit;
     border-radius: 3px;
-    background: var(--mle-bg-secondary);
-    color: var(--mle-text-primary);
+    background: transparent;
 }
 
 .column-item button {
@@ -741,12 +710,12 @@ body {
 
 /* Macro editor container */
 .macro-editor {
-    background: var(--mle-bg-primary);
-    border: 1px solid var(--mle-border);
+    background: transparent;
+    border: 1px solid;
+    border-color: inherit;
     border-radius: 4px;
     padding: 15px;
     margin-bottom: 20px;
-    color: var(--mle-text-primary);
 }
 
 .macro-editor h4 {

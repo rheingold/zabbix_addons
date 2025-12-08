@@ -33,7 +33,7 @@ $this->addCssFile('modules/listedit/assets/css/listedit.css');
     <!-- Selection Panels Container - Side by Side -->
     <div class="selection-panels-container">
         <!-- Host/Template Selection Panel -->
-        <div class="selection-panel selection-panel-host">
+        <div class="selection-panel selection-panel-host ui-widget-content">
             <label class="panel-label">1. Select Host or Template</label>
             <div class="selection-content">
                 <div id="current-host-display" class="selection-display">Not selected</div>
@@ -42,7 +42,7 @@ $this->addCssFile('modules/listedit/assets/css/listedit.css');
         </div>
         
         <!-- Macro Selector Panel -->
-        <div class="selection-panel selection-panel-macro">
+        <div class="selection-panel selection-panel-macro ui-widget-content">
             <label class="panel-label">2. Select Macro to Edit</label>
             <div class="selection-content">
                 <select id="macro-selector" class="macro-selector">
@@ -58,8 +58,8 @@ $this->addCssFile('modules/listedit/assets/css/listedit.css');
 </div>
 
 <!-- Host/Template Search Dialog -->
-<div id="host-search-overlay" class="host-search-overlay"></div>
-<div id="host-search-dialog" class="host-search-dialog">
+<div id="host-search-overlay" class="host-search-overlay overlay-dialogue"></div>
+<div id="host-search-dialog" class="host-search-dialog overlay-dialogue-body">
     <div class="dialog-header">
         <h3>Search & Select Host or Template</h3>
         <button type="button" id="close-host-search" class="dialog-close">✕</button>
@@ -77,8 +77,8 @@ $this->addCssFile('modules/listedit/assets/css/listedit.css');
 </div>
 
 <!-- Column Editor Dialog -->
-<div id="column-editor-overlay" class="host-search-overlay"></div>
-<div id="column-editor-dialog" class="host-search-dialog">
+<div id="column-editor-overlay" class="host-search-overlay overlay-dialogue"></div>
+<div id="column-editor-dialog" class="host-search-dialog overlay-dialogue-body">
     <div class="dialog-header">
         <h3>Edit Column Headers</h3>
         <button type="button" id="close-column-editor-x" class="dialog-close">✕</button>

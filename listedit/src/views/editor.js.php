@@ -326,7 +326,7 @@ var MacroListEditor = (function() {
      */
     function renderPipeTableEditor(value, macroId) {
         var parsed = parsePipeSeparated(value);
-        var html = '<table class="list-table" data-macroid="' + macroId + '">';
+        var html = '<table class="list-table list-table-bordered" data-macroid="' + macroId + '">';
         
         // Header row with edit button
         html += '<thead><tr>';
