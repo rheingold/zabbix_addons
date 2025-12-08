@@ -93,7 +93,6 @@ body {
 .selection-panel {
     flex: 1;
     min-width: 350px;
-    background: transparent;
     border: 1px solid;
     border-color: inherit;
     border-radius: 8px;
