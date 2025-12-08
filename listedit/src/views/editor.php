@@ -33,7 +33,7 @@ $this->addCssFile('modules/listedit/assets/css/listedit.css');
     <!-- Selection Panels Container - Side by Side -->
     <div class="selection-panels-container">
         <!-- Host/Template Selection Panel -->
-        <div class="selection-panel selection-panel-host ui-widget-header">
+        <div class="selection-panel selection-panel-host ui-state-default">
             <label class="panel-label">1. Select Host or Template</label>
             <div class="selection-content">
                 <div id="current-host-display" class="selection-display">Not selected</div>
@@ -42,7 +42,7 @@ $this->addCssFile('modules/listedit/assets/css/listedit.css');
         </div>
         
         <!-- Macro Selector Panel -->
-        <div class="selection-panel selection-panel-macro ui-widget-header">
+        <div class="selection-panel selection-panel-macro ui-state-default">
             <label class="panel-label">2. Select Macro to Edit</label>
             <div class="selection-content">
                 <select id="macro-selector" class="macro-selector">
