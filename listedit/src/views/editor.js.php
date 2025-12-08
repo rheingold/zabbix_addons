@@ -647,7 +647,7 @@ var MacroListEditor = (function() {
         var dialog = jQuery('#column-editor-dialog');
         var editor = dialog.data('editor');
         var table = editor.find('.list-table');
-        var displayToggle = editor.find('.toggle-header-format').is(':checked');
+        var displayToggle = dialog.data('display-toggle');  // Use the toggle state from when dialog was opened
         var newHeaders = [];
         var fullHeaders = [];  // Store full format names
         var oldHeaders = [];
@@ -786,7 +786,9 @@ var MacroListEditor = (function() {
             var rows = [];
             var headers = [];
             table.find('thead th').not(':last').each(function() {
-                headers.push(jQuery(this).text());
+                // Use full header from data attribute, not displayed text
+                var fullHeader = jQuery(this).data('full-header') || jQuery(this).text();
+                headers.push(fullHeader);
             });
             rows.push(headers.join('|'));
             

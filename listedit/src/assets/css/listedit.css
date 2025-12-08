@@ -53,16 +53,13 @@
 
 /* Apply theme to page and editor */
 body {
-    background: inherit;
-    color: inherit;
+    /* Let Zabbix theme control body entirely */
 }
 
 #macro-list-editor {
-    /* Inherit colors from Zabbix theme */
+    /* Let parent Zabbix theme control background */
     color: var(--mle-text-primary);
     padding: 24px;
-    background: inherit;
-    min-height: 100vh;
 }
 
 .macro-list-wrapper {
@@ -166,7 +163,7 @@ body {
 }
 
 .selection-display {
-    flex: 1;
+    flex: 0 1 140px;
     padding: 10px 12px;
     background: var(--mle-bg-secondary);
     border: 1px solid var(--mle-border);
@@ -180,9 +177,12 @@ body {
 }
 
 .btn-search {
-    padding: 10px 14px;
-    min-width: 44px;
+    padding: 10px 16px;
+    min-width: 56px;
     flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 #macro-selector {
@@ -683,6 +683,10 @@ body {
     font-size: 14px;
     font-weight: 500;
     transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
 }
 
 .btn-primary {
@@ -714,6 +718,10 @@ body {
     padding: 6px 12px;
     font-size: 12px;
     box-shadow: 0 2px 4px rgba(231, 76, 60, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
 }
 
 .btn-danger:hover {
