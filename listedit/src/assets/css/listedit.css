@@ -531,10 +531,9 @@ body {
     width: 90%;
     max-height: 80vh;
     overflow-y: auto;
-    background: transparent;
-    border: 1px solid;
-    border-color: inherit;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    background-color: #f5f5f5;
+    border: 1px solid #d3d3d3;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
 }
 
 #column-editor-dialog.active {
@@ -563,6 +562,10 @@ body {
     gap: 10px;
     margin-bottom: 10px;
     align-items: center;
+    background: #fff;
+    padding: 12px;
+    border-radius: 6px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
 }
 
 .column-item input {
