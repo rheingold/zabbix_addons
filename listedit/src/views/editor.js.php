@@ -266,15 +266,15 @@ var MacroListEditor = (function() {
         
         var html = '<div class="macro-editor" data-macroid="' + macro.hostmacroid + '" data-format="' + format + '">';
         html += '<div class="macro-header">';
-        html += '<div style="display: flex; justify-content: space-between; align-items: center;">';
+        html += '<div style="display: flex; justify-content: space-between; align-items: flex-start;">';
         html += '<div>';
         html += '<h4 style="margin: 0 0 5px 0;">' + escapeHtml(macro.macro) + '</h4>';
         if (macro.description) {
-            html += '<p style="margin: 0; color: var(--mle-text-secondary); font-size: 12px;">' + escapeHtml(macro.description) + '</p>';
+            html += '<p style="margin: 0; font-size: 12px; opacity: 0.7;">' + escapeHtml(macro.description) + '</p>';
         }
-        html += '<div class="format-info" style="margin-top: 5px;">Format: <strong>' + format + '</strong></div>';
         html += '</div>';
         html += '<div style="text-align: right;">';
+        html += '<div class="format-info" style="margin-bottom: 8px; font-size: 12px;">Format: <strong>' + format + '</strong></div>';
         html += '<label style="display: flex; align-items: center; gap: 8px; font-size: 13px;">';
         html += '<input type="checkbox" class="toggle-header-format" data-macroid="' + macro.hostmacroid + '" checked>';
         html += '<span>Show text names only</span>';
@@ -675,7 +675,8 @@ var MacroListEditor = (function() {
             
             // Check for unique names (case-insensitive)
             var lowerVal = val.toLowerCase();
-            if (newHeaders.some(h => h.toLowerCase() === lowerVal)) {
+            // For new columns, check if the name already exists in the collected newHeaders
+            if (newHeaders.some(function(h) { return h.toLowerCase() === lowerVal; })) {
                 showError('Column name "' + val + '" is already used. Column names must be unique.');
                 allValid = false;
                 return false;

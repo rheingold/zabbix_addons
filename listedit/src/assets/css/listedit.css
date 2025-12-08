@@ -148,10 +148,7 @@ body {
 #macro-selector {
     flex: 1 1 300px;
     padding: 10px 12px;
-    border: 1px solid;
-    border-color: inherit;
     border-radius: 6px;
-    background: transparent;
     font-size: 13px;
     cursor: pointer;
     transition: all 0.15s ease;
@@ -159,7 +156,6 @@ body {
 
 #macro-selector:hover {
     border-color: var(--mle-accent);
-    background: var(--mle-bg-hover);
 }
 
 #macro-selector:focus {
@@ -528,16 +524,12 @@ body {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    background: transparent;
-    border: 2px solid;
-    border-color: inherit;
     border-radius: 6px;
     padding: 20px;
     z-index: 1001;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
     max-width: 500px;
     width: 90%;
-    color: var(--mle-text-primary);
 }
 
 .column-editor-dialog.active {
