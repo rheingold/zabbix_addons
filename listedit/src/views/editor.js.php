@@ -72,6 +72,8 @@ var MacroListEditor = (function() {
         jQuery('#open-column-editor').on('click', openColumnEditor);
         jQuery('#column-editor-confirm').on('click', confirmColumnEditor);
         jQuery('#close-column-editor').on('click', closeColumnEditor);
+        jQuery('#column-editor-overlay').on('click', closeColumnEditor);
+        jQuery('#add-column-btn').on('click', addColumnToEditor);
     }
     
     /**
@@ -263,11 +265,21 @@ var MacroListEditor = (function() {
         
         var html = '<div class="macro-editor" data-macroid="' + macro.hostmacroid + '" data-format="' + format + '">';
         html += '<div class="macro-header">';
-        html += '<h4>' + escapeHtml(macro.macro) + '</h4>';
+        html += '<div style="display: flex; justify-content: space-between; align-items: center;">';
+        html += '<div>';
+        html += '<h4 style="margin: 0 0 5px 0;">' + escapeHtml(macro.macro) + '</h4>';
         if (macro.description) {
-            html += '<p style="margin: 5px 0; color: #999; font-size: 12px;">' + escapeHtml(macro.description) + '</p>';
+            html += '<p style="margin: 0; color: var(--mle-text-secondary); font-size: 12px;">' + escapeHtml(macro.description) + '</p>';
         }
-        html += '<div class="format-info">Format: <strong>' + format + '</strong></div>';
+        html += '<div class="format-info" style="margin-top: 5px;">Format: <strong>' + format + '</strong></div>';
+        html += '</div>';
+        html += '<div style="text-align: right;">';
+        html += '<label style="display: flex; align-items: center; gap: 8px; font-size: 13px;">';
+        html += '<input type="checkbox" class="toggle-header-format" data-macroid="' + macro.hostmacroid + '" checked>';
+        html += '<span>Show text names only</span>';
+        html += '</label>';
+        html += '</div>';
+        html += '</div>';
         html += '</div>';
         
         // Table editor
@@ -313,12 +325,17 @@ var MacroListEditor = (function() {
      */
     function renderPipeTableEditor(value, macroId) {
         var parsed = parsePipeSeparated(value);
-        var html = '<table class="list-table">';
+        var html = '<table class="list-table" data-macroid="' + macroId + '">';
         
         // Header row with edit button
         html += '<thead><tr>';
         jQuery.each(parsed.headers, function(i, header) {
-            html += '<th>' + escapeHtml(header) + '</th>';
+            // Display header in "text name only" format (strip brackets and hash)
+            var displayHeader = header;
+            if (displayHeader.startsWith('{#') && displayHeader.endsWith('}')) {
+                displayHeader = displayHeader.substring(2, displayHeader.length - 1);
+            }
+            html += '<th data-full-header="' + escapeHtml(header) + '" class="table-header" data-macroid="' + macroId + '">' + escapeHtml(displayHeader) + '</th>';
         });
         html += '<th style="width: 100px;">Actions</th>';
         html += '</tr></thead>';
@@ -400,6 +417,27 @@ var MacroListEditor = (function() {
      */
     function attachMacroEditorEvents(container, macroId) {
         var editor = container.find('.macro-editor');
+        
+        // Toggle header format (text-only vs full)
+        editor.find('.toggle-header-format').on('change', function() {
+            var table = editor.find('.list-table');
+            var checked = jQuery(this).is(':checked');
+            table.find('th.table-header').each(function() {
+                var th = jQuery(this);
+                var fullHeader = th.data('full-header');
+                if (checked) {
+                    // Show text only (strip {# and })
+                    var displayHeader = fullHeader;
+                    if (displayHeader.startsWith('{#') && displayHeader.endsWith('}')) {
+                        displayHeader = displayHeader.substring(2, displayHeader.length - 1);
+                    }
+                    th.text(displayHeader);
+                } else {
+                    // Show full format
+                    th.text(fullHeader);
+                }
+            });
+        });
         
         // Inline cell editing
         editor.find('.cell-editable').on('click', function() {
@@ -535,40 +573,30 @@ var MacroListEditor = (function() {
         
         jQuery.each(headers, function(i, header) {
             var item = jQuery('<div class="column-item">');
-            item.append(jQuery('<input type="text" value="' + escapeHtml(header) + '" data-col-index="' + i + '">'));
-            item.append(jQuery('<button type="button">Remove</button>').on('click', function() {
+            item.append(jQuery('<input type="text" value="' + escapeHtml(header) + '" data-col-index="' + i + '" class="column-header-input">'));
+            item.append(jQuery('<button type="button" class="btn-danger">Remove</button>').on('click', function() {
                 jQuery(this).closest('.column-item').remove();
             }));
             cols.append(item);
         });
         
         dialog.addClass('active').data('editor', editor);
+        jQuery('#column-editor-overlay').addClass('active');
     }
     
     /**
-     * Open/close column editor
+     * Add new column to column editor
      */
-    function openColumnEditor(editor) {
-        var table = editor.find('.list-table');
-        var headers = [];
-        table.find('thead th').not(':last').each(function() {
-            headers.push(jQuery(this).text());
-        });
-        
+    function addColumnToEditor() {
         var dialog = jQuery('#column-editor-dialog');
         var cols = dialog.find('#column-editor-columns');
-        cols.empty();
-        
-        jQuery.each(headers, function(i, header) {
-            var item = jQuery('<div class="column-item">');
-            item.append(jQuery('<input type="text" value="' + escapeHtml(header) + '" data-col-index="' + i + '">'));
-            item.append(jQuery('<button type="button">Remove</button>').on('click', function() {
-                jQuery(this).closest('.column-item').remove();
-            }));
-            cols.append(item);
-        });
-        
-        dialog.addClass('active').data('editor', editor);
+        var newIndex = cols.find('.column-item').length;
+        var item = jQuery('<div class="column-item">');
+        item.append(jQuery('<input type="text" placeholder="Column name..." data-col-index="' + newIndex + '" class="column-header-input">'));
+        item.append(jQuery('<button type="button" class="btn-danger">Remove</button>').on('click', function() {
+            jQuery(this).closest('.column-item').remove();
+        }));
+        cols.append(item);
     }
     
     /**
@@ -580,9 +608,25 @@ var MacroListEditor = (function() {
         var table = editor.find('.list-table');
         var newHeaders = [];
         
+        // Validate and collect headers
+        var allValid = true;
         dialog.find('#column-editor-columns input').each(function() {
-            newHeaders.push(jQuery(this).val());
+            var val = jQuery(this).val().trim();
+            if (!val) {
+                showError('Column name cannot be empty');
+                allValid = false;
+                return false;
+            }
+            // Validate macro name (no spaces, brackets, etc.)
+            if (!/^[a-zA-Z0-9_-]+$/.test(val)) {
+                showError('Column name contains invalid characters. Use only letters, numbers, underscore, and hyphen.');
+                allValid = false;
+                return false;
+            }
+            newHeaders.push(val);
         });
+        
+        if (!allValid) return;
         
         // Update table headers
         var thead = table.find('thead tr');
@@ -622,6 +666,7 @@ var MacroListEditor = (function() {
      */
     function closeColumnEditor() {
         jQuery('#column-editor-dialog').removeClass('active');
+        jQuery('#column-editor-overlay').removeClass('active');
     }
     
     /**

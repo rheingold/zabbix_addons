@@ -53,14 +53,13 @@
 
 /* Apply theme to page and editor */
 body {
-    background: var(--mle-bg-page);
+    /* Let Zabbix CSS control body background */
 }
 
 #macro-list-editor {
-    background: var(--mle-bg-page);
+    /* Inherit background from parent Zabbix theme */
     color: var(--mle-text-primary);
     padding: 24px;
-    min-height: 100vh;
 }
 
 .macro-list-wrapper {
@@ -463,10 +462,11 @@ body {
 
 .bulk-editor-textarea {
     width: 100%;
-    min-height: 150px;
-    padding: 10px;
+    height: 50px;
+    max-width: 600px;
+    padding: 8px;
     border: 1px solid var(--mle-border);
-    border-radius: 3px;
+    border-radius: 6px;
     font-family: monospace;
     font-size: 12px;
     background: var(--mle-bg-primary);
@@ -474,11 +474,13 @@ body {
     box-sizing: border-box;
     margin-top: 10px;
     transition: all 0.15s ease;
+    resize: none;
 }
 
 .bulk-editor-textarea:focus {
     outline: none;
     border-color: var(--mle-accent);
+    box-shadow: 0 0 0 3px rgba(2, 117, 216, 0.1);
 }
 
 .column-editor-dialog {
@@ -631,6 +633,20 @@ body {
 .btn-secondary:hover {
     background: var(--mle-bg-hover);
     border-color: var(--mle-accent);
+}
+
+.btn-danger {
+    background: var(--mle-danger);
+    color: white;
+    padding: 6px 12px;
+    font-size: 12px;
+    box-shadow: 0 2px 4px rgba(231, 76, 60, 0.15);
+}
+
+.btn-danger:hover {
+    background: #d73526;
+    box-shadow: 0 4px 8px rgba(231, 76, 60, 0.25);
+    transform: translateY(-1px);
 }
 
 /* Macro editor container */

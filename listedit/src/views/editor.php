@@ -80,7 +80,7 @@ $this->addCssFile('modules/listedit/assets/css/listedit.css');
     </div>
     <div class="dialog-body">
         <div id="column-editor-columns"></div>
-        <button type="button" style="margin-top: 10px;">+ Add Column</button>
+        <button type="button" id="add-column-btn" class="btn-secondary" style="margin-top: 10px; width: 100%;">+ Add Column</button>
     </div>
     <div class="dialog-footer">
         <button type="button" class="btn-secondary" id="close-column-editor">Cancel</button>
