@@ -518,21 +518,16 @@ body {
     box-shadow: 0 0 0 3px rgba(2, 117, 216, 0.1);
 }
 
-.column-editor-dialog {
+#column-editor-dialog {
     display: none;
     position: fixed;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    border-radius: 6px;
-    padding: 20px;
     z-index: 1001;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-    max-width: 500px;
-    width: 90%;
 }
 
-.column-editor-dialog.active {
+#column-editor-dialog.active {
     display: block;
     animation: fadeIn 0.2s ease;
 }
