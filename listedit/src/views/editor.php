@@ -78,7 +78,7 @@ $this->addCssFile('modules/listedit/assets/css/listedit.css');
 
 <!-- Column Editor Dialog -->
 <div id="column-editor-overlay" class="host-search-overlay"></div>
-<div id="column-editor-dialog" class="host-search-dialog ui-widget-content">
+<div id="column-editor-dialog" class="overlay-dialogue">
     <div class="dialog-header">
         <h3>Edit Column Headers</h3>
         <button type="button" id="close-column-editor-x" class="dialog-close">✕</button>
