@@ -532,6 +532,8 @@ body {
     width: 90%;
     max-height: 80vh;
     overflow-y: auto;
+    background-color: #f5f5f5;
+    color: #333;
 }
 
 #column-editor-dialog.active {
