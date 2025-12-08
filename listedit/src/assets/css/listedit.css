@@ -30,8 +30,7 @@ body {
 }
 
 #macro-list-editor {
-    /* Let parent Zabbix theme control background */
-    color: var(--mle-text-primary);
+    /* Let parent Zabbix theme control background and colors */
     padding: 24px;
 }
 
@@ -41,24 +40,18 @@ body {
 }
 
 .macro-item {
-    background: var(--mle-bg-primary);
     border-radius: 8px;
     margin-bottom: 24px;
-    border: 1px solid var(--mle-border);
     padding: 24px;
     transition: all 0.2s ease-in-out;
-    box-shadow: var(--mle-shadow);
 }
 
 .macro-item:hover {
-    background: var(--mle-bg-primary);
-    box-shadow: var(--mle-shadow-hover);
     transform: translateY(-2px);
 }
 
 .macro-item h3 {
     margin: 0 0 12px 0;
-    color: var(--mle-text-primary);
     font-size: 18px;
     font-weight: 600;
 }
@@ -70,7 +63,6 @@ body {
 }
 
 .macro-selector label {
-    color: var(--mle-text-primary);
     font-weight: 500;
     margin-bottom: 8px;
     font-size: 14px;
@@ -78,10 +70,7 @@ body {
 
 .macro-selector select {
     padding: 12px;
-    border: 1px solid var(--mle-border);
     border-radius: 6px;
-    background: var(--mle-bg-secondary);
-    color: var(--mle-text-primary);
     font-size: 14px;
     min-width: 300px;
     cursor: pointer;
@@ -122,7 +111,6 @@ body {
 .panel-label {
     display: block;
     margin: 0 0 12px 0;
-    color: var(--mle-text-primary);
     font-size: 13px;
     font-weight: 600;
     text-transform: uppercase;
@@ -140,12 +128,9 @@ body {
 .selection-display {
     flex: 0 1 140px;
     padding: 10px 12px;
-    background: var(--mle-bg-secondary);
-    border: 1px solid var(--mle-border);
     border-radius: 6px;
     font-weight: 500;
     font-size: 13px;
-    color: var(--mle-text-primary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
