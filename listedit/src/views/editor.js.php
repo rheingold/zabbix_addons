@@ -1,8 +1,9 @@
 <?php
 /**
  * ============================================================================
- * File: editor.js.php
+ * File: editor.js.php (v0.2.0)
  * Created: 2025-12-02
+ * Updated: 2025-12-08
  *
  * Lead & Architecture: lukas@plachy.eu
  * Development: Claude Sonnet 4 (AI Assistant, Anthropic)
@@ -11,7 +12,15 @@
  * ============================================================================
  *
  * PURPOSE:
- * Inline JavaScript initialization and MacroListEditor definition.
+ * Inline JavaScript initialization and MacroListEditor definition (v0.2.0).
+ * Features:
+ * - Macro dropdown selector (only one macro editable at a time)
+ * - Host/template search dialog (searchable, scalable to 100+ items)
+ * - Inline row/column editing with real-time table updates
+ * - Bulk text editor panel that syncs with table
+ * - Smooth transitions and theme-aware styling
+ * - Column editor dialog for adding/removing columns
+ *
  * All code here is inline to ensure proper execution order.
  *
  * @var CView $this
@@ -31,7 +40,11 @@ var MacroListEditor = (function() {
     var state = {
         currentHostId: null,
         currentHostType: null,
-        currentMacro: null
+        currentMacroId: null,
+        currentMacroName: null,
+        allMacros: [],
+        hostList: [],
+        bulkEditorExpanded: false
     };
     
     /**
@@ -40,10 +53,29 @@ var MacroListEditor = (function() {
     function init(options) {
         config = jQuery.extend(config, options);
         console.log('MacroListEditor: initialized with config', config);
+        
+        // Setup host search button
+        jQuery('#open-host-search').on('click', openHostSearchDialog);
+        jQuery('#host-search-confirm').on('click', confirmHostSearch);
+        jQuery('#close-host-search').on('click', closeHostSearchDialog);
+        jQuery('#host-search-overlay').on('click', closeHostSearchDialog);
+        
+        // Setup macro selector
+        jQuery('#macro-selector').on('change', function() {
+            selectMacro(jQuery(this).val());
+        });
+        
+        // Setup bulk editor toggle
+        jQuery('#bulk-editor-toggle').on('click', toggleBulkEditor);
+        
+        // Setup column editor
+        jQuery('#open-column-editor').on('click', openColumnEditor);
+        jQuery('#column-editor-confirm').on('click', confirmColumnEditor);
+        jQuery('#close-column-editor').on('click', closeColumnEditor);
     }
     
     /**
-     * Load host/template list
+     * Load host/template list for search dialog
      */
     function loadHostList() {
         console.log('MacroListEditor: loadHostList() called');
@@ -58,7 +90,8 @@ var MacroListEditor = (function() {
                     return;
                 }
                 
-                populateHostSelect(response.items);
+                state.hostList = response.items;
+                populateHostSearch(response.items);
             },
             error: function(xhr, status, error) {
                 console.error('MacroListEditor: hostlist error', xhr, status, error);
@@ -68,47 +101,94 @@ var MacroListEditor = (function() {
     }
     
     /**
-     * Populate host/template select dropdown
+     * Open host/template search dialog
      */
-    function populateHostSelect(items) {
-        var select = jQuery('#hostid');
-        select.empty();
-        select.append(jQuery('<option>', {
-            value: '',
-            text: 'Select host or template...'
-        }));
+    function openHostSearchDialog() {
+        jQuery('#host-search-overlay, #host-search-dialog').addClass('active');
+        loadHostList();
+        jQuery('#host-search-input').focus().val('');
+    }
+    
+    /**
+     * Close host/template search dialog
+     */
+    function closeHostSearchDialog() {
+        jQuery('#host-search-overlay, #host-search-dialog').removeClass('active');
+    }
+    
+    /**
+     * Populate host search results
+     */
+    function populateHostSearch(items) {
+        var results = jQuery('#host-search-results');
+        results.empty();
         
-        jQuery.each(items, function(i, item) {
-            var label = item.name + ' (' + item.type + ')';
-            select.append(jQuery('<option>', {
-                value: item.id,
-                text: label,
-                'data-type': item.type
-            }));
+        var searchTerm = jQuery('#host-search-input').val().toLowerCase();
+        var filtered = items.filter(function(item) {
+            return item.name.toLowerCase().includes(searchTerm) || 
+                   item.host.toLowerCase().includes(searchTerm);
         });
+        
+        if (filtered.length === 0) {
+            results.html('<div style="padding: 20px; text-align: center; color: #999;">No items found</div>');
+            return;
+        }
+        
+        jQuery.each(filtered, function(i, item) {
+            var elem = jQuery('<div class="host-search-item"></div>')
+                .data('id', item.id)
+                .data('type', item.type)
+                .text(item.name + ' (' + item.type + ')')
+                .on('click', function() {
+                    state.currentHostId = jQuery(this).data('id');
+                    state.currentHostType = jQuery(this).data('type');
+                    jQuery('#host-search-results .host-search-item').removeClass('selected');
+                    jQuery(this).addClass('selected');
+                });
+            results.append(elem);
+        });
+    }
+    
+    /**
+     * Search host/template by input
+     */
+    function handleHostSearch() {
+        populateHostSearch(state.hostList);
+    }
+    
+    /**
+     * Confirm host selection
+     */
+    function confirmHostSearch() {
+        if (!state.currentHostId) {
+            showError('Please select a host or template');
+            return;
+        }
+        
+        closeHostSearchDialog();
+        
+        // Update current display and load macros
+        var hostItem = state.hostList.find(function(h) { return h.id === state.currentHostId; });
+        jQuery('#current-host-display').text('Selected: ' + hostItem.name + ' (' + hostItem.type + ')');
+        
+        loadMacros();
     }
     
     /**
      * Load macros for selected host/template
      */
     function loadMacros() {
-        var hostId = jQuery('#hostid').val();
-        var hostType = jQuery('#hostid option:selected').data('type');
-        
-        if (!hostId) {
-            showError('Please select a host or template');
+        if (!state.currentHostId) {
+            showError('Please select a host or template first');
             return;
         }
-        
-        state.currentHostId = hostId;
-        state.currentHostType = hostType;
         
         jQuery.ajax({
             url: 'zabbix.php?action=listedit.macrolist',
             method: 'POST',
             data: {
-                hostid: hostId,
-                type: hostType
+                hostid: state.currentHostId,
+                type: state.currentHostType
             },
             dataType: 'json',
             success: function(response) {
@@ -117,7 +197,13 @@ var MacroListEditor = (function() {
                     return;
                 }
                 
-                displayMacros(response.macros);
+                state.allMacros = response.macros || [];
+                populateMacroSelector(state.allMacros);
+                
+                // Clear editor
+                jQuery('#macro-editor-container').empty();
+                state.currentMacroId = null;
+                state.currentMacroName = null;
             },
             error: function(xhr, status, error) {
                 showError('Failed to load macros: ' + error);
@@ -126,120 +212,125 @@ var MacroListEditor = (function() {
     }
     
     /**
-     * Display macros in UI
+     * Populate macro selector dropdown
      */
-    function displayMacros(macros) {
-        var container = jQuery('#macro-list-container');
-        container.empty();
-        
-        if (macros.length === 0) {
-            container.html('<div class="msg-info">No _LIST} macros found for this host/template.</div>');
-            return;
-        }
-        
-        var html = '<div class="macro-list-wrapper">';
+    function populateMacroSelector(macros) {
+        var select = jQuery('#macro-selector');
+        select.empty();
+        select.append(jQuery('<option>', {
+            value: '',
+            text: 'Select a macro to edit...'
+        }));
         
         jQuery.each(macros, function(i, macro) {
-            html += '<div class="macro-item" style="margin-bottom: 30px; border: 1px solid #ccc; padding: 15px;">';
-            html += '<h3>' + escapeHtml(macro.macro) + '</h3>';
-            
-            if (macro.description) {
-                html += '<p style="color: #666; margin: 5px 0 10px 0;"><strong>Description:</strong> ' + escapeHtml(macro.description) + '</p>';
-            }
-            
-            html += '<div class="macro-editor-container" data-macroid="' + macro.hostmacroid + '" data-value="' + escapeHtml(macro.value) + '">';
-            html += renderMacroEditor(macro);
-            html += '</div>';
-            
-            html += '</div>';
+            select.append(jQuery('<option>', {
+                value: macro.hostmacroid,
+                text: macro.macro,
+                'data-macro-name': macro.macro
+            }));
         });
-        
-        html += '</div>';
-        container.html(html);
-        
-        // Attach event handlers
-        attachEditorEvents();
     }
     
     /**
-     * Render macro editor based on format
+     * Select and edit a specific macro
      */
-    function renderMacroEditor(macro) {
+    function selectMacro(macroId) {
+        if (!macroId) {
+            jQuery('#macro-editor-container').empty();
+            state.currentMacroId = null;
+            state.currentMacroName = null;
+            return;
+        }
+        
+        var macro = state.allMacros.find(function(m) { return m.hostmacroid === macroId; });
+        if (!macro) return;
+        
+        state.currentMacroId = macroId;
+        state.currentMacroName = macro.macro;
+        
+        displayMacroEditor(macro);
+    }
+    
+    /**
+     * Display macro editor for selected macro
+     */
+    function displayMacroEditor(macro) {
+        var container = jQuery('#macro-editor-container');
+        container.empty();
+        
         var value = macro.value || '';
         var format = detectFormat(value);
         
-        var html = '<div class="format-info" style="margin-bottom: 10px; color: #666; font-size: 11px;">';
-        html += 'Detected format: <strong>' + format + '</strong>';
+        var html = '<div class="macro-editor" data-macroid="' + macro.hostmacroid + '" data-format="' + format + '">';
+        html += '<div class="macro-header">';
+        html += '<h4>' + escapeHtml(macro.macro) + '</h4>';
+        if (macro.description) {
+            html += '<p style="margin: 5px 0; color: #999; font-size: 12px;">' + escapeHtml(macro.description) + '</p>';
+        }
+        html += '<div class="format-info">Format: <strong>' + format + '</strong></div>';
         html += '</div>';
         
+        // Table editor
+        html += renderMacroTableEditor(macro, format);
+        
+        // Bulk text editor
+        html += renderBulkTextEditor(value, format);
+        
+        html += '</div>';
+        
+        container.html(html);
+        
+        // Attach event handlers
+        attachMacroEditorEvents(container, macro.hostmacroid);
+    }
+    
+    /**
+     * Render macro table editor
+     */
+    function renderMacroTableEditor(macro, format) {
+        var value = macro.value || '';
+        var html = '<div class="macro-table-editor" style="margin-top: 15px;">';
+        
         if (format === 'pipe-separated') {
-            html += renderPipeEditor(value, macro.hostmacroid);
+            html += renderPipeTableEditor(value, macro.hostmacroid);
         } else if (format === 'json-array') {
-            html += renderJsonArrayEditor(value, macro.hostmacroid);
+            html += renderJsonTableEditor(value, macro.hostmacroid);
         } else {
-            html += renderEmptyEditor(macro.hostmacroid);
+            html += '<div class="empty-editor"><p>This macro is empty or in an unsupported format.</p>';
+            if (config.canEdit) {
+                html += '<button type="button" class="btn-init-pipe" data-macroid="' + macro.hostmacroid + '">Initialize as Pipe-Separated</button> ';
+                html += '<button type="button" class="btn-init-json" data-macroid="' + macro.hostmacroid + '">Initialize as JSON Array</button>';
+            }
+            html += '</div>';
         }
         
+        html += '</div>';
         return html;
     }
     
     /**
-     * Detect macro value format
+     * Render pipe-separated table editor with inline editing
      */
-    function detectFormat(value) {
-        if (!value || value.trim() === '') {
-            return 'empty';
-        }
-        
-        // Try JSON array
-        if (value.trim().startsWith('[') && value.trim().endsWith(']')) {
-            try {
-                JSON.parse(value);
-                return 'json-array';
-            } catch(e) {
-                // Not valid JSON, fall through
-            }
-        }
-        
-        // Check for pipe-separated format
-        if (value.includes('|') || value.includes(',')) {
-            return 'pipe-separated';
-        }
-        
-        return 'unknown';
-    }
-    
-    /**
-     * Render pipe-separated format editor
-     */
-    function renderPipeEditor(value, macroId) {
+    function renderPipeTableEditor(value, macroId) {
         var parsed = parsePipeSeparated(value);
+        var html = '<table class="list-table">';
         
-        var html = '<div class="pipe-editor" data-format="pipe-separated">';
-        html += '<table class="list-table" style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">';
-        
-        // Header row
-        html += '<thead><tr style="background: #f0f0f0;">';
+        // Header row with edit button
+        html += '<thead><tr>';
         jQuery.each(parsed.headers, function(i, header) {
-            html += '<th style="border: 1px solid #ccc; padding: 8px;">' + escapeHtml(header) + '</th>';
+            html += '<th>' + escapeHtml(header) + '</th>';
         });
-        html += '<th style="border: 1px solid #ccc; padding: 8px; width: 80px;">Actions</th>';
+        html += '<th style="width: 100px;">Actions</th>';
         html += '</tr></thead>';
         
         // Data rows
         html += '<tbody>';
         jQuery.each(parsed.rows, function(i, row) {
-            html += '<tr data-row-index="' + i + '">';
+            html += '<tr data-row-index="' + i + '" class="row-enter">';
             jQuery.each(row, function(j, cell) {
-                html += '<td style="border: 1px solid #ccc; padding: 4px;">';
-                html += '<input type="text" class="cell-input" data-col="' + j + '" value="' + escapeHtml(cell) + '" style="width: 100%; border: none; padding: 4px;" ' + (config.canEdit ? '' : 'readonly') + '>';
-                html += '</td>';
+                html += '<td class="cell-editable" data-col="' + j + '">' + escapeHtml(cell) + '</td>';
             });
-            html += '<td style="border: 1px solid #ccc; padding: 4px; text-align: center;">';
-            if (config.canEdit) {
-                html += '<button class="btn-link btn-remove-row" title="Remove row">❌</button>';
-            }
-            html += '</td>';
+            html += '<td><button type="button" class="btn-link btn-remove-row" title="Remove row" data-macroid="' + macroId + '">✕</button></td>';
             html += '</tr>';
         });
         html += '</tbody>';
@@ -247,19 +338,20 @@ var MacroListEditor = (function() {
         html += '</table>';
         
         if (config.canEdit) {
-            html += '<button class="btn-add-row" data-macroid="' + macroId + '">Add Row</button> ';
-            html += '<button class="btn-save" data-macroid="' + macroId + '">Save Changes</button>';
+            html += '<div style="margin-top: 10px;">';
+            html += '<button type="button" class="btn-row-add" data-macroid="' + macroId + '">+ Add Row</button> ';
+            html += '<button type="button" class="btn-col-edit" data-macroid="' + macroId + '">Edit Columns</button> ';
+            html += '<button type="button" class="btn-save" data-macroid="' + macroId + '">Save Changes</button>';
+            html += '</div>';
         }
-        
-        html += '</div>';
         
         return html;
     }
     
     /**
-     * Render JSON array editor
+     * Render JSON array table editor with inline editing
      */
-    function renderJsonArrayEditor(value, macroId) {
+    function renderJsonTableEditor(value, macroId) {
         var items = [];
         try {
             items = JSON.parse(value);
@@ -267,24 +359,14 @@ var MacroListEditor = (function() {
             items = [];
         }
         
-        var html = '<div class="json-array-editor" data-format="json-array">';
-        html += '<table class="list-table" style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">';
-        html += '<thead><tr style="background: #f0f0f0;">';
-        html += '<th style="border: 1px solid #ccc; padding: 8px;">Value</th>';
-        html += '<th style="border: 1px solid #ccc; padding: 8px; width: 80px;">Actions</th>';
-        html += '</tr></thead>';
+        var html = '<table class="list-table">';
+        html += '<thead><tr><th>Value</th><th style="width: 100px;">Actions</th></tr></thead>';
         html += '<tbody>';
         
         jQuery.each(items, function(i, item) {
-            html += '<tr data-row-index="' + i + '">';
-            html += '<td style="border: 1px solid #ccc; padding: 4px;">';
-            html += '<input type="text" class="cell-input" data-col="0" value="' + escapeHtml(item) + '" style="width: 100%; border: none; padding: 4px;" ' + (config.canEdit ? '' : 'readonly') + '>';
-            html += '</td>';
-            html += '<td style="border: 1px solid #ccc; padding: 4px; text-align: center;">';
-            if (config.canEdit) {
-                html += '<button class="btn-link btn-remove-row" title="Remove row">❌</button>';
-            }
-            html += '</td>';
+            html += '<tr data-row-index="' + i + '" class="row-enter">';
+            html += '<td class="cell-editable" data-col="0">' + escapeHtml(item) + '</td>';
+            html += '<td><button type="button" class="btn-link btn-remove-row" title="Remove" data-macroid="' + macroId + '">✕</button></td>';
             html += '</tr>';
         });
         
@@ -292,181 +374,399 @@ var MacroListEditor = (function() {
         html += '</table>';
         
         if (config.canEdit) {
-            html += '<button class="btn-add-row" data-macroid="' + macroId + '">Add Value</button> ';
-            html += '<button class="btn-save" data-macroid="' + macroId + '">Save Changes</button>';
+            html += '<div style="margin-top: 10px;">';
+            html += '<button type="button" class="btn-row-add" data-macroid="' + macroId + '">+ Add Value</button> ';
+            html += '<button type="button" class="btn-save" data-macroid="' + macroId + '">Save Changes</button>';
+            html += '</div>';
         }
-        
-        html += '</div>';
         
         return html;
     }
     
     /**
-     * Render empty editor
+     * Render bulk text editor panel
      */
-    function renderEmptyEditor(macroId) {
-        var html = '<div class="empty-editor">';
-        html += '<p style="color: #666;">This macro is empty or in an unsupported format.</p>';
-        
-        if (config.canEdit) {
-            html += '<button class="btn-init-pipe" data-macroid="' + macroId + '">Initialize as Pipe-Separated</button> ';
-            html += '<button class="btn-init-json" data-macroid="' + macroId + '">Initialize as JSON Array</button>';
-        }
-        
+    function renderBulkTextEditor(value, format) {
+        var html = '<div class="bulk-editor-panel">';
+        html += '<div class="bulk-editor-toggle">📝 Raw Text Editor (click to expand)</div>';
+        html += '<textarea class="bulk-editor-textarea" placeholder="Edit the raw ' + format + ' value here. Changes sync with table.">' + escapeHtml(value) + '</textarea>';
+        html += '<div style="margin-top: 10px; color: #999; font-size: 12px;">Edit this text directly or edit the table above. Both stay in sync.</div>';
         html += '</div>';
-        
         return html;
     }
     
     /**
-     * Parse pipe-separated format
+     * Attach macro editor event handlers
      */
-    function parsePipeSeparated(value) {
-        var parts = value.split(',');
-        var headers = [];
-        var rows = [];
+    function attachMacroEditorEvents(container, macroId) {
+        var editor = container.find('.macro-editor');
         
-        if (parts.length === 0) {
-            return {headers: [], rows: []};
-        }
+        // Inline cell editing
+        editor.find('.cell-editable').on('click', function() {
+            if (!config.canEdit) return;
+            editCell(jQuery(this));
+        });
         
-        // First part is headers
-        headers = parts[0].split('|');
-        var numCols = headers.length;
+        // Add row
+        editor.find('.btn-row-add').on('click', function() {
+            addTableRow(editor, jQuery(this));
+        });
         
-        // Remaining parts are data rows
-        for (var i = 1; i < parts.length; i++) {
-            var cells = parts[i].split('|');
-            // Pad or truncate to match header count
-            while (cells.length < numCols) {
-                cells.push('');
-            }
-            if (cells.length > numCols) {
-                cells = cells.slice(0, numCols);
-            }
-            rows.push(cells);
-        }
+        // Remove row
+        editor.find('.btn-remove-row').on('click', function() {
+            removeTableRow(jQuery(this).closest('tr'), editor);
+        });
         
-        return {headers: headers, rows: rows};
+        // Edit columns
+        editor.find('.btn-col-edit').on('click', function() {
+            openColumnEditor(editor);
+        });
+        
+        // Save
+        editor.find('.btn-save').on('click', function() {
+            saveMacro(macroId, editor);
+        });
+        
+        // Initialize empty
+        editor.find('.btn-init-pipe').on('click', function() {
+            initializeMacro(macroId, 'pipe');
+        });
+        editor.find('.btn-init-json').on('click', function() {
+            initializeMacro(macroId, 'json');
+        });
+        
+        // Bulk editor
+        editor.find('.bulk-editor-toggle').on('click', function() {
+            jQuery(this).closest('.bulk-editor-panel').toggleClass('collapsed');
+        });
+        
+        editor.find('.bulk-editor-textarea').on('change', function() {
+            syncTextToTable(jQuery(this), editor);
+        });
     }
     
     /**
-     * Serialize pipe-separated format
+     * Edit cell inline
      */
-    function serializePipeSeparated(container) {
-        var rows = [];
-        var headers = [];
+    function editCell(cell) {
+        if (cell.find('input').length > 0) return; // Already editing
         
-        // Extract headers
-        container.find('thead th').not(':last').each(function() {
+        var value = cell.text();
+        var input = jQuery('<input type="text" class="cell-input" value="' + escapeHtml(value) + '">');
+        
+        var originalContent = cell.html();
+        cell.html(input);
+        input.focus().select();
+        
+        function saveEdit() {
+            var newValue = input.val();
+            cell.text(newValue);
+            syncTableToText(cell.closest('.macro-editor'));
+        }
+        
+        function cancelEdit() {
+            cell.html(originalContent);
+        }
+        
+        input.on('blur', saveEdit);
+        input.on('keypress', function(e) {
+            if (e.which === 13) { // Enter
+                saveEdit();
+            } else if (e.which === 27) { // Escape
+                cancelEdit();
+            }
+        });
+    }
+    
+    /**
+     * Add table row
+     */
+    function addTableRow(editor, button) {
+        var table = editor.find('.list-table');
+        var thead = table.find('thead tr');
+        var numCols = thead.find('th').length - 1; // Exclude actions column
+        
+        var row = jQuery('<tr data-row-index="0" class="row-enter">');
+        for (var i = 0; i < numCols; i++) {
+            row.append(jQuery('<td class="cell-editable" data-col="' + i + '"></td>'));
+        }
+        row.append(jQuery('<td><button type="button" class="btn-link btn-remove-row" title="Remove row">✕</button></td>'));
+        
+        table.find('tbody').append(row);
+        
+        // Reattach events to new row
+        row.find('.cell-editable').on('click', function() {
+            if (config.canEdit) editCell(jQuery(this));
+        });
+        row.find('.btn-remove-row').on('click', function() {
+            removeTableRow(jQuery(this).closest('tr'), editor);
+        });
+        
+        syncTableToText(editor);
+    }
+    
+    /**
+     * Remove table row
+     */
+    function removeTableRow(row, editor) {
+        if (!config.canEdit) return;
+        if (!confirm('Remove this row?')) return;
+        
+        row.addClass('row-exit');
+        setTimeout(function() {
+            row.remove();
+            syncTableToText(editor);
+        }, 300);
+    }
+    
+    /**
+     * Open column editor dialog
+     */
+    function openColumnEditor(editor) {
+        var table = editor.find('.list-table');
+        var headers = [];
+        table.find('thead th').not(':last').each(function() {
             headers.push(jQuery(this).text());
         });
         
-        rows.push(headers.join('|'));
+        var dialog = jQuery('#column-editor-dialog');
+        var cols = dialog.find('#column-editor-columns');
+        cols.empty();
         
-        // Extract data rows
-        container.find('tbody tr').each(function() {
-            var cells = [];
-            jQuery(this).find('.cell-input').each(function() {
-                cells.push(jQuery(this).val());
+        jQuery.each(headers, function(i, header) {
+            var item = jQuery('<div class="column-item">');
+            item.append(jQuery('<input type="text" value="' + escapeHtml(header) + '" data-col-index="' + i + '">'));
+            item.append(jQuery('<button type="button">Remove</button>').on('click', function() {
+                jQuery(this).closest('.column-item').remove();
+            }));
+            cols.append(item);
+        });
+        
+        dialog.addClass('active').data('editor', editor);
+    }
+    
+    /**
+     * Open/close column editor
+     */
+    function openColumnEditor(editor) {
+        var table = editor.find('.list-table');
+        var headers = [];
+        table.find('thead th').not(':last').each(function() {
+            headers.push(jQuery(this).text());
+        });
+        
+        var dialog = jQuery('#column-editor-dialog');
+        var cols = dialog.find('#column-editor-columns');
+        cols.empty();
+        
+        jQuery.each(headers, function(i, header) {
+            var item = jQuery('<div class="column-item">');
+            item.append(jQuery('<input type="text" value="' + escapeHtml(header) + '" data-col-index="' + i + '">'));
+            item.append(jQuery('<button type="button">Remove</button>').on('click', function() {
+                jQuery(this).closest('.column-item').remove();
+            }));
+            cols.append(item);
+        });
+        
+        dialog.addClass('active').data('editor', editor);
+    }
+    
+    /**
+     * Confirm column editor changes
+     */
+    function confirmColumnEditor() {
+        var dialog = jQuery('#column-editor-dialog');
+        var editor = dialog.data('editor');
+        var table = editor.find('.list-table');
+        var newHeaders = [];
+        
+        dialog.find('#column-editor-columns input').each(function() {
+            newHeaders.push(jQuery(this).val());
+        });
+        
+        // Update table headers
+        var thead = table.find('thead tr');
+        thead.find('th').not(':last').remove();
+        jQuery.each(newHeaders, function(i, header) {
+            thead.find('th:first').before(jQuery('<th>' + escapeHtml(header) + '</th>'));
+        });
+        
+        // Update/truncate data rows
+        table.find('tbody tr').each(function() {
+            var tr = jQuery(this);
+            var cells = tr.find('td.cell-editable');
+            
+            // Remove extra cells
+            while (cells.length > newHeaders.length) {
+                cells.last().remove();
+                cells = tr.find('td.cell-editable');
+            }
+            
+            // Add missing cells
+            while (cells.length < newHeaders.length) {
+                var newCell = jQuery('<td class="cell-editable" data-col="' + cells.length + '"></td>');
+                newCell.on('click', function() {
+                    if (config.canEdit) editCell(jQuery(this));
+                });
+                tr.find('td:nth-child(' + (cells.length + 1) + ')').before(newCell);
+                cells = tr.find('td.cell-editable');
+            }
+        });
+        
+        syncTableToText(editor);
+        closeColumnEditor();
+    }
+    
+    /**
+     * Close column editor dialog
+     */
+    function closeColumnEditor() {
+        jQuery('#column-editor-dialog').removeClass('active');
+    }
+    
+    /**
+     * Toggle bulk editor panel
+     */
+    function toggleBulkEditor() {
+        jQuery(this).closest('.bulk-editor-panel').toggleClass('collapsed');
+    }
+    
+    /**
+     * Sync table changes to text area
+     */
+    function syncTableToText(editor) {
+        var table = editor.find('.list-table');
+        var format = editor.data('format');
+        var newValue;
+        
+        if (format === 'pipe-separated') {
+            var rows = [];
+            var headers = [];
+            table.find('thead th').not(':last').each(function() {
+                headers.push(jQuery(this).text());
             });
-            if (cells.length > 0) {
-                rows.push(cells.join('|'));
-            }
-        });
-        
-        return rows.join(',');
-    }
-    
-    /**
-     * Serialize JSON array format
-     */
-    function serializeJsonArray(container) {
-        var items = [];
-        
-        container.find('tbody tr').each(function() {
-            var value = jQuery(this).find('.cell-input').val();
-            if (value) {
-                items.push(value);
-            }
-        });
-        
-        return JSON.stringify(items);
-    }
-    
-    /**
-     * Attach event handlers
-     */
-    function attachEditorEvents() {
-        // Add row button
-        jQuery('.btn-add-row').on('click', function() {
-            var editor = jQuery(this).closest('.pipe-editor, .json-array-editor');
-            var tbody = editor.find('tbody');
-            var numCols = editor.find('thead th').not(':last').length;
+            rows.push(headers.join('|'));
             
-            var html = '<tr data-row-index="' + tbody.find('tr').length + '">';
-            for (var i = 0; i < numCols; i++) {
-                html += '<td style="border: 1px solid #ccc; padding: 4px;">';
-                html += '<input type="text" class="cell-input" data-col="' + i + '" value="" style="width: 100%; border: none; padding: 4px;">';
-                html += '</td>';
-            }
-            html += '<td style="border: 1px solid #ccc; padding: 4px; text-align: center;">';
-            html += '<button class="btn-link btn-remove-row" title="Remove row">❌</button>';
-            html += '</td>';
-            html += '</tr>';
-            
-            tbody.append(html);
-            attachRemoveRowEvents();
-        });
+            table.find('tbody tr').each(function() {
+                var cells = [];
+                jQuery(this).find('td.cell-editable').each(function() {
+                    cells.push(jQuery(this).text());
+                });
+                if (cells.length > 0) {
+                    rows.push(cells.join('|'));
+                }
+            });
+            newValue = rows.join(',');
+        } else if (format === 'json-array') {
+            var items = [];
+            table.find('tbody tr').each(function() {
+                var value = jQuery(this).find('td.cell-editable').text();
+                if (value) items.push(value);
+            });
+            newValue = JSON.stringify(items);
+        }
         
-        // Remove row button
-        attachRemoveRowEvents();
-        
-        // Save button
-        jQuery('.btn-save').on('click', function() {
-            var macroId = jQuery(this).data('macroid');
-            saveMacro(macroId);
-        });
-        
-        // Initialize buttons
-        jQuery('.btn-init-pipe').on('click', function() {
-            var macroId = jQuery(this).data('macroid');
-            initializePipeFormat(macroId);
-        });
-        
-        jQuery('.btn-init-json').on('click', function() {
-            var macroId = jQuery(this).data('macroid');
-            initializeJsonFormat(macroId);
-        });
+        editor.find('.bulk-editor-textarea').val(newValue);
     }
     
     /**
-     * Attach remove row event handlers
+     * Sync text area changes to table
      */
-    function attachRemoveRowEvents() {
-        jQuery('.btn-remove-row').off('click').on('click', function() {
-            if (confirm('Remove this row?')) {
-                jQuery(this).closest('tr').remove();
+    function syncTextToTable(textarea, editor) {
+        var format = editor.data('format');
+        var value = textarea.val();
+        var table = editor.find('.list-table');
+        
+        try {
+            if (format === 'pipe-separated') {
+                var parts = value.split(',');
+                if (parts.length > 0) {
+                    var headers = parts[0].split('|');
+                    var tbody = table.find('tbody');
+                    tbody.empty();
+                    
+                    for (var i = 1; i < parts.length; i++) {
+                        var cells = parts[i].split('|');
+                        var row = jQuery('<tr class="row-enter">');
+                        jQuery.each(cells, function(j, cell) {
+                            row.append(jQuery('<td class="cell-editable" data-col="' + j + '">' + escapeHtml(cell) + '</td>'));
+                        });
+                        row.append(jQuery('<td><button type="button" class="btn-link btn-remove-row">✕</button></td>'));
+                        tbody.append(row);
+                    }
+                    
+                    // Reattach events
+                    editor.find('.cell-editable').on('click', function() {
+                        if (config.canEdit) editCell(jQuery(this));
+                    });
+                    editor.find('.btn-remove-row').on('click', function() {
+                        removeTableRow(jQuery(this).closest('tr'), editor);
+                    });
+                }
+            } else if (format === 'json-array') {
+                var items = JSON.parse(value);
+                var tbody = table.find('tbody');
+                tbody.empty();
+                
+                jQuery.each(items, function(i, item) {
+                    var row = jQuery('<tr class="row-enter">');
+                    row.append(jQuery('<td class="cell-editable" data-col="0">' + escapeHtml(item) + '</td>'));
+                    row.append(jQuery('<td><button type="button" class="btn-link btn-remove-row">✕</button></td>'));
+                    tbody.append(row);
+                });
+                
+                // Reattach events
+                editor.find('.cell-editable').on('click', function() {
+                    if (config.canEdit) editCell(jQuery(this));
+                });
+                editor.find('.btn-remove-row').on('click', function() {
+                    removeTableRow(jQuery(this).closest('tr'), editor);
+                });
             }
-        });
+        } catch(e) {
+            console.error('Error syncing text to table:', e);
+        }
     }
     
     /**
      * Save macro changes
      */
-    function saveMacro(macroId) {
-        var container = jQuery('[data-macroid="' + macroId + '"]');
-        var editor = container.find('.pipe-editor, .json-array-editor');
+    function saveMacro(macroId, editor) {
+        var table = editor.find('.list-table');
         var format = editor.data('format');
         var newValue;
         
-        if (format === 'pipe-separated') {
-            newValue = serializePipeSeparated(editor);
-        } else if (format === 'json-array') {
-            newValue = serializeJsonArray(editor);
+        // Get value from textarea if it exists, otherwise rebuild from table
+        var textarea = editor.find('.bulk-editor-textarea');
+        if (textarea.length > 0) {
+            newValue = textarea.val();
         } else {
-            showError('Unknown format');
-            return;
+            if (format === 'pipe-separated') {
+                var rows = [];
+                var headers = [];
+                table.find('thead th').not(':last').each(function() {
+                    headers.push(jQuery(this).text());
+                });
+                rows.push(headers.join('|'));
+                
+                table.find('tbody tr').each(function() {
+                    var cells = [];
+                    jQuery(this).find('td.cell-editable').each(function() {
+                        cells.push(jQuery(this).text());
+                    });
+                    if (cells.length > 0) {
+                        rows.push(cells.join('|'));
+                    }
+                });
+                newValue = rows.join(',');
+            } else if (format === 'json-array') {
+                var items = [];
+                table.find('tbody tr').each(function() {
+                    var value = jQuery(this).find('td.cell-editable').text();
+                    if (value) items.push(value);
+                });
+                newValue = JSON.stringify(items);
+            }
         }
         
         jQuery.ajax({
@@ -482,7 +782,6 @@ var MacroListEditor = (function() {
                     showError('Failed to save: ' + response.error);
                     return;
                 }
-                
                 showSuccess('Macro saved successfully');
             },
             error: function(xhr, status, error) {
@@ -492,31 +791,17 @@ var MacroListEditor = (function() {
     }
     
     /**
-     * Initialize pipe format
+     * Initialize empty macro
      */
-    function initializePipeFormat(macroId) {
-        var defaultValue = '{#COL1}|{#COL2},value1|value2';
-        updateMacroValue(macroId, defaultValue);
-    }
-    
-    /**
-     * Initialize JSON format
-     */
-    function initializeJsonFormat(macroId) {
-        var defaultValue = '["value1","value2"]';
-        updateMacroValue(macroId, defaultValue);
-    }
-    
-    /**
-     * Update macro value and reload
-     */
-    function updateMacroValue(macroId, value) {
+    function initializeMacro(macroId, format) {
+        var defaultValue = format === 'pipe' ? '{#COL1}|{#COL2},value1|value2' : '["value1","value2"]';
+        
         jQuery.ajax({
             url: 'zabbix.php?action=listedit.macroupdate',
             method: 'POST',
             data: {
                 hostmacroid: macroId,
-                value: value
+                value: defaultValue
             },
             dataType: 'json',
             success: function(response) {
@@ -524,14 +809,63 @@ var MacroListEditor = (function() {
                     showError('Failed to initialize: ' + response.error);
                     return;
                 }
-                
-                // Reload macros
                 loadMacros();
             },
             error: function(xhr, status, error) {
                 showError('Failed to initialize macro: ' + error);
             }
         });
+    }
+    
+    /**
+     * Parse pipe-separated format
+     */
+    function parsePipeSeparated(value) {
+        var parts = value.split(',');
+        var headers = [];
+        var rows = [];
+        
+        if (parts.length === 0) {
+            return {headers: [], rows: []};
+        }
+        
+        headers = parts[0].split('|');
+        var numCols = headers.length;
+        
+        for (var i = 1; i < parts.length; i++) {
+            var cells = parts[i].split('|');
+            while (cells.length < numCols) {
+                cells.push('');
+            }
+            if (cells.length > numCols) {
+                cells = cells.slice(0, numCols);
+            }
+            rows.push(cells);
+        }
+        
+        return {headers: headers, rows: rows};
+    }
+    
+    /**
+     * Detect macro value format
+     */
+    function detectFormat(value) {
+        if (!value || value.trim() === '') {
+            return 'empty';
+        }
+        
+        if (value.trim().startsWith('[') && value.trim().endsWith(']')) {
+            try {
+                JSON.parse(value);
+                return 'json-array';
+            } catch(e) {}
+        }
+        
+        if (value.includes('|') || value.includes(',')) {
+            return 'pipe-separated';
+        }
+        
+        return 'unknown';
     }
     
     /**
@@ -565,7 +899,9 @@ var MacroListEditor = (function() {
     return {
         init: init,
         loadHostList: loadHostList,
-        loadMacros: loadMacros
+        loadMacros: loadMacros,
+        selectMacro: selectMacro,
+        handleHostSearch: handleHostSearch
     };
 })();
 
