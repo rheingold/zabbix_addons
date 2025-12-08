@@ -539,10 +539,6 @@ body {
     overflow-y: auto;
 }
 
-#column-editor-dialog.ui-widget-content {
-    background-color: inherit;
-}
-
 #column-editor-dialog.active {
     display: block;
     animation: fadeIn 0.2s ease;
