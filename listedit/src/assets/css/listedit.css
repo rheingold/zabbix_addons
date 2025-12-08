@@ -14,9 +14,19 @@
  * Styles for Macro List Editor with theme-aware colors and smooth transitions
  */
 
-/* CSS variables - inherit from Zabbix theme */
+/* CSS variables - match Zabbix 7.4 theme colors */
 :root {
-    /* Colors (not used for backgrounds, let Zabbix theme control those) */
+    /* Light theme - Zabbix default */
+    --mle-bg-primary: #ffffff;
+    --mle-bg-secondary: #f5f5f5;
+    --mle-text-primary: #333333;
+    --mle-text-secondary: #666666;
+    --mle-border: #cccccc;
+    --mle-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+    --mle-shadow-hover: 0 4px 8px rgba(0, 0, 0, 0.12);
+    --mle-bg-hover: #f0f5ff;
+    
+    /* Accent colors */
     --mle-accent: #0275d8;
     --mle-accent-hover: #025aa5;
     --mle-success: #27ae60;
@@ -24,25 +34,23 @@
     --mle-info: #3498db;
 }
 
-/* Light theme - Zabbix default */
-:root {
-    --mle-text-primary: #1a1a1a;
-    --mle-text-secondary: #666666;
-    --mle-border: #d0d0d0;
-    --mle-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-    --mle-shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.12);
-    --mle-bg-hover: #e3f2fd;
-}
-
-/* Dark theme - when Zabbix uses dark mode */
+/* Dark theme - when Zabbix uses dark mode (class: .sidebar-nav-dark or body.dark-theme) */
 body.sidebar-nav-dark,
-body[data-zabbix-theme="dark-theme"] {
-    --mle-text-primary: #f0f0f0;
+body.dark-theme,
+body[data-zabbix-theme="dark"],
+body[data-zabbix-theme="dark-theme"],
+html.dark-theme,
+html.sidebar-nav-dark {
+    --mle-bg-primary: #2b2b2b;
+    --mle-bg-secondary: #3f3f3f;
+    --mle-text-primary: #e0e0e0;
     --mle-text-secondary: #b0b0b0;
-    --mle-border: #444444;
-    --mle-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-    --mle-shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.4);
-    --mle-bg-hover: #363636;
+    --mle-border: #555555;
+    --mle-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    --mle-shadow-hover: 0 4px 8px rgba(0, 0, 0, 0.4);
+    --mle-bg-hover: #454545;
+    --mle-accent: #5ca3ff;
+    --mle-accent-hover: #3d8fff;
 }
 
 /* Apply theme to page and editor */
@@ -125,7 +133,7 @@ body {
 .selection-panel {
     flex: 1;
     min-width: 350px;
-    background: inherit;
+    background: var(--mle-bg-primary);
     border: 1px solid var(--mle-border);
     border-radius: 8px;
     padding: 16px;
@@ -185,7 +193,7 @@ body {
     padding: 10px 12px;
     border: 1px solid var(--mle-border);
     border-radius: 6px;
-    background: inherit;
+    background: var(--mle-bg-secondary);
     color: var(--mle-text-primary);
     font-size: 13px;
     cursor: pointer;
@@ -213,7 +221,7 @@ body {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    background: inherit;
+    background: var(--mle-bg-primary);
     border: 1px solid var(--mle-border);
     border-radius: 12px;
     padding: 32px;
@@ -250,7 +258,7 @@ body {
     margin-bottom: 15px;
     box-sizing: border-box;
     color: var(--mle-text-primary);
-    background: inherit;
+    background: var(--mle-bg-secondary);
     font-size: 14px;
 }
 
@@ -265,7 +273,7 @@ body {
     overflow-y: auto;
     border: 1px solid var(--mle-border);
     border-radius: 3px;
-    background: inherit;
+    background: var(--mle-bg-secondary);
 }
 
 .host-search-item {
@@ -310,7 +318,7 @@ body {
     font-size: 14px;
     width: 100%;
     border-collapse: collapse;
-    background: inherit;
+    background: var(--mle-bg-primary);
 }
 
 .list-table tr {
@@ -349,7 +357,7 @@ body {
 }
 
 .list-table thead {
-    background: inherit;
+    background: var(--mle-bg-secondary);
     border-bottom: 2px solid var(--mle-border);
 }
 
@@ -375,7 +383,7 @@ body {
 }
 
 .list-table tbody tr:hover {
-    background: var(--mle-bg-hover);
+    background: var(--mle-bg-secondary);
 }
 
 .list-table input.cell-input {
@@ -383,7 +391,7 @@ body {
     padding: 10px;
     border: 1px solid var(--mle-accent);
     border-radius: 6px;
-    background: inherit;
+    background: var(--mle-bg-secondary);
     color: var(--mle-text-primary);
     width: 100%;
     box-sizing: border-box;
@@ -393,7 +401,7 @@ body {
 .list-table input.cell-input:focus {
     outline: none;
     border-color: var(--mle-accent);
-    background: inherit;
+    background: var(--mle-bg-primary);
     box-shadow: 0 0 0 3px rgba(2, 117, 216, 0.1);
 }
 
@@ -501,7 +509,7 @@ body {
 .empty-editor {
     padding: 20px;
     text-align: center;
-    background: inherit;
+    background: var(--mle-bg-secondary);
     border: 1px dashed var(--mle-border);
     border-radius: 4px;
     color: var(--mle-text-secondary);
@@ -511,7 +519,7 @@ body {
 .bulk-editor-panel {
     margin-top: 20px;
     padding: 15px;
-    background: inherit;
+    background: var(--mle-bg-secondary);
     border: 1px solid var(--mle-border);
     border-radius: 4px;
     transition: all 0.2s ease;
@@ -542,7 +550,7 @@ body {
     border-radius: 6px;
     font-family: monospace;
     font-size: 12px;
-    background: inherit;
+    background: var(--mle-bg-primary);
     color: var(--mle-text-primary);
     box-sizing: border-box;
     margin-top: 10px;
@@ -562,7 +570,7 @@ body {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    background: inherit;
+    background: var(--mle-bg-primary);
     border: 2px solid var(--mle-border);
     border-radius: 6px;
     padding: 20px;
@@ -606,7 +614,7 @@ body {
     padding: 8px;
     border: 1px solid var(--mle-border);
     border-radius: 3px;
-    background: inherit;
+    background: var(--mle-bg-secondary);
     color: var(--mle-text-primary);
 }
 
@@ -733,7 +741,7 @@ body {
 
 /* Macro editor container */
 .macro-editor {
-    background: inherit;
+    background: var(--mle-bg-primary);
     border: 1px solid var(--mle-border);
     border-radius: 4px;
     padding: 15px;

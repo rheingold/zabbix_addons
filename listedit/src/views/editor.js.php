@@ -650,7 +650,9 @@ var MacroListEditor = (function() {
         var dialog = jQuery('#column-editor-dialog');
         var editor = dialog.data('editor');
         var table = editor.find('.list-table');
-        var displayToggle = dialog.data('display-toggle');  // Use the toggle state from when dialog was opened
+        // Get the CURRENT toggle state from the editor, not the stored state
+        // This ensures if user toggled while editing, we use the current state
+        var displayToggle = editor.find('.toggle-header-format').is(':checked');
         var newHeaders = [];
         var fullHeaders = [];  // Store full format names
         var oldHeaders = [];
@@ -727,8 +729,9 @@ var MacroListEditor = (function() {
         // Update table headers
         var thead = table.find('thead tr');
         thead.find('th').not(':last').remove();
+        var actionHeaderCell = thead.find('th:last'); // Get the actions header
         jQuery.each(newHeaders, function(i, header) {
-            thead.find('th:first').before(jQuery('<th data-full-header="' + escapeHtml(fullHeaders[i]) + '" class="table-header">' + escapeHtml(header) + '</th>'));
+            actionHeaderCell.before(jQuery('<th data-full-header="' + escapeHtml(fullHeaders[i]) + '" class="table-header">' + escapeHtml(header) + '</th>'));
         });
         
         // Update/rebuild data rows to match new column structure
