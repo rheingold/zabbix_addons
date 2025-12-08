@@ -58,8 +58,8 @@ $this->addCssFile('modules/listedit/assets/css/listedit.css');
 </div>
 
 <!-- Host/Template Search Dialog -->
-<div id="host-search-overlay" class="host-search-overlay overlay-dialogue"></div>
-<div id="host-search-dialog" class="host-search-dialog overlay-dialogue-body">
+<div id="host-search-overlay" class="host-search-overlay"></div>
+<div id="host-search-dialog" class="host-search-dialog ui-widget-content">
     <div class="dialog-header">
         <h3>Search & Select Host or Template</h3>
         <button type="button" id="close-host-search" class="dialog-close">✕</button>
@@ -77,8 +77,8 @@ $this->addCssFile('modules/listedit/assets/css/listedit.css');
 </div>
 
 <!-- Column Editor Dialog -->
-<div id="column-editor-overlay" class="host-search-overlay overlay-dialogue"></div>
-<div id="column-editor-dialog" class="host-search-dialog overlay-dialogue-body">
+<div id="column-editor-overlay" class="host-search-overlay"></div>
+<div id="column-editor-dialog" class="host-search-dialog ui-widget-content">
     <div class="dialog-header">
         <h3>Edit Column Headers</h3>
         <button type="button" id="close-column-editor-x" class="dialog-close">✕</button>
