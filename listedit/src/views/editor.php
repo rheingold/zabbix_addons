@@ -30,25 +30,30 @@ $this->addCssFile('modules/listedit/assets/css/listedit.css');
 
 <div id="macro-list-editor" class="macro-list-editor">
     
-    <!-- Host/Template Selection Panel -->
-    <div class="selection-panel">
-        <h3>1. Select Host or Template</h3>
-        <div id="current-host-display" style="margin-bottom: 10px; font-weight: bold;">
-            Select a host or template...
+    <!-- Selection Panels Container - Side by Side -->
+    <div class="selection-panels-container">
+        <!-- Host/Template Selection Panel -->
+        <div class="selection-panel selection-panel-host">
+            <label class="panel-label">1. Select Host or Template</label>
+            <div class="selection-content">
+                <div id="current-host-display" class="selection-display">Not selected</div>
+                <button type="button" id="open-host-search" class="btn-primary btn-search">🔍</button>
+            </div>
         </div>
-        <button type="button" id="open-host-search" class="btn-primary">🔍 Search & Select Host/Template</button>
-    </div>
-    
-    <!-- Macro Selector Panel -->
-    <div class="selection-panel" style="margin-top: 20px;">
-        <h3>2. Select Macro to Edit</h3>
-        <select id="macro-selector" class="macro-selector">
-            <option value="">Select a macro...</option>
-        </select>
+        
+        <!-- Macro Selector Panel -->
+        <div class="selection-panel selection-panel-macro">
+            <label class="panel-label">2. Select Macro to Edit</label>
+            <div class="selection-content">
+                <select id="macro-selector" class="macro-selector">
+                    <option value="">Select a macro...</option>
+                </select>
+            </div>
+        </div>
     </div>
     
     <!-- Macro Editor Container -->
-    <div id="macro-editor-container" style="margin-top: 30px;"></div>
+    <div id="macro-editor-container" class="macro-editor-section"></div>
     
 </div>
 
@@ -76,14 +81,14 @@ $this->addCssFile('modules/listedit/assets/css/listedit.css');
 <div id="column-editor-dialog" class="host-search-dialog">
     <div class="dialog-header">
         <h3>Edit Column Headers</h3>
-        <button type="button" id="close-column-editor" class="dialog-close">✕</button>
+        <button type="button" id="close-column-editor-x" class="dialog-close">✕</button>
     </div>
     <div class="dialog-body">
         <div id="column-editor-columns"></div>
         <button type="button" id="add-column-btn" class="btn-secondary" style="margin-top: 10px; width: 100%;">+ Add Column</button>
     </div>
     <div class="dialog-footer">
-        <button type="button" class="btn-secondary" id="close-column-editor">Cancel</button>
+        <button type="button" class="btn-secondary" id="close-column-editor-cancel">Cancel</button>
         <button type="button" class="btn-primary" id="column-editor-confirm">Save</button>
     </div>
 </div>

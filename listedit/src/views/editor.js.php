@@ -71,7 +71,8 @@ var MacroListEditor = (function() {
         // Setup column editor
         jQuery('#open-column-editor').on('click', openColumnEditor);
         jQuery('#column-editor-confirm').on('click', confirmColumnEditor);
-        jQuery('#close-column-editor').on('click', closeColumnEditor);
+        jQuery('#close-column-editor-x').on('click', closeColumnEditor);
+        jQuery('#close-column-editor-cancel').on('click', closeColumnEditor);
         jQuery('#column-editor-overlay').on('click', closeColumnEditor);
         jQuery('#add-column-btn').on('click', addColumnToEditor);
     }
@@ -437,6 +438,28 @@ var MacroListEditor = (function() {
                     th.text(fullHeader);
                 }
             });
+            
+            // If column editor is open, refresh it to match toggle
+            var dialog = jQuery('#column-editor-dialog');
+            if (dialog.hasClass('active')) {
+                var cols = dialog.find('#column-editor-columns');
+                cols.find('input').each(function() {
+                    var input = jQuery(this);
+                    var fullHeader = input.data('full-header');
+                    var displayValue = fullHeader;
+                    
+                    if (checked) {
+                        // Show text-only
+                        if (fullHeader.startsWith('{#') && fullHeader.endsWith('}')) {
+                            displayValue = fullHeader.substring(2, fullHeader.length - 1);
+                        }
+                    } else {
+                        // Show full format
+                        displayValue = fullHeader;
+                    }
+                    input.val(displayValue);
+                });
+            }
         });
         
         // Inline cell editing
@@ -562,18 +585,36 @@ var MacroListEditor = (function() {
      */
     function openColumnEditor(editor) {
         var table = editor.find('.list-table');
-        var headers = [];
+        var displayToggle = editor.find('.toggle-header-format').is(':checked');
+        var fullHeaders = [];
+        
+        // Collect full header names from data attributes or text content
         table.find('thead th').not(':last').each(function() {
-            headers.push(jQuery(this).text());
+            var th = jQuery(this);
+            var fullHeader = th.data('full-header') || (displayToggle ? '{#' + th.text() + '}' : th.text());
+            fullHeaders.push(fullHeader);
         });
         
         var dialog = jQuery('#column-editor-dialog');
         var cols = dialog.find('#column-editor-columns');
         cols.empty();
         
-        jQuery.each(headers, function(i, header) {
+        jQuery.each(fullHeaders, function(i, fullHeader) {
+            var displayValue = fullHeader;
+            
+            // Show value based on current toggle setting
+            if (displayToggle) {
+                // Toggle is on: show text-only
+                if (fullHeader.startsWith('{#') && fullHeader.endsWith('}')) {
+                    displayValue = fullHeader.substring(2, fullHeader.length - 1);
+                }
+            } else {
+                // Toggle is off: show full {#name} format
+                displayValue = fullHeader;
+            }
+            
             var item = jQuery('<div class="column-item">');
-            item.append(jQuery('<input type="text" value="' + escapeHtml(header) + '" data-col-index="' + i + '" class="column-header-input">'));
+            item.append(jQuery('<input type="text" value="' + escapeHtml(displayValue) + '" data-col-index="' + i + '" data-full-header="' + escapeHtml(fullHeader) + '" class="column-header-input">'));
             item.append(jQuery('<button type="button" class="btn-danger">Remove</button>').on('click', function() {
                 jQuery(this).closest('.column-item').remove();
             }));
@@ -606,55 +647,112 @@ var MacroListEditor = (function() {
         var dialog = jQuery('#column-editor-dialog');
         var editor = dialog.data('editor');
         var table = editor.find('.list-table');
+        var displayToggle = editor.find('.toggle-header-format').is(':checked');
         var newHeaders = [];
+        var fullHeaders = [];  // Store full format names
+        var oldHeaders = [];
         
-        // Validate and collect headers
+        // Collect old headers for data mapping
+        table.find('thead th').not(':last').each(function() {
+            var th = jQuery(this);
+            oldHeaders.push(th.data('full-header') || th.text());
+        });
+        
+        // Validate and collect new headers
         var allValid = true;
-        dialog.find('#column-editor-columns input').each(function() {
+        dialog.find('#column-editor-columns input').each(function(idx) {
             var val = jQuery(this).val().trim();
             if (!val) {
                 showError('Column name cannot be empty');
                 allValid = false;
                 return false;
             }
-            // Validate macro name (no spaces, brackets, etc.)
-            if (!/^[a-zA-Z0-9_-]+$/.test(val)) {
-                showError('Column name contains invalid characters. Use only letters, numbers, underscore, and hyphen.');
+            
+            // Check for unique names (case-insensitive)
+            var lowerVal = val.toLowerCase();
+            if (newHeaders.some(h => h.toLowerCase() === lowerVal)) {
+                showError('Column name "' + val + '" is already used. Column names must be unique.');
                 allValid = false;
                 return false;
             }
-            newHeaders.push(val);
+            
+            // If toggle is off, user is entering names with {# }, validate that
+            // If toggle is on, user is entering text-only names, validate without {# }
+            var fullHeader = val;
+            var displayHeader = val;
+            
+            if (!displayToggle) {
+                // User entering full format {#name}
+                if (!val.startsWith('{#') || !val.endsWith('}')) {
+                    showError('Column header must be in format {#name}. For example: {#HOSTNAME}');
+                    allValid = false;
+                    return false;
+                }
+                if (!/^{#[a-zA-Z0-9_-]+}$/.test(val)) {
+                    showError('Invalid column header format. Use only {#name} with letters, numbers, underscore, and hyphen.');
+                    allValid = false;
+                    return false;
+                }
+                fullHeader = val;
+                displayHeader = val.substring(2, val.length - 1);
+            } else {
+                // User entering text-only name
+                if (!/^[a-zA-Z0-9_-]+$/.test(val)) {
+                    showError('Column name contains invalid characters. Use only letters, numbers, underscore, and hyphen.');
+                    allValid = false;
+                    return false;
+                }
+                // Convert to full format for storage
+                fullHeader = '{#' + val + '}';
+                displayHeader = val;
+            }
+            
+            newHeaders.push(displayHeader);
+            fullHeaders.push(fullHeader);
         });
         
         if (!allValid) return;
+        
+        // Calculate which columns are new (didn't exist before)
+        var newColumnIndices = [];
+        jQuery.each(fullHeaders, function(i, fullHeader) {
+            if (oldHeaders.indexOf(fullHeader) === -1) {
+                newColumnIndices.push(i);
+            }
+        });
         
         // Update table headers
         var thead = table.find('thead tr');
         thead.find('th').not(':last').remove();
         jQuery.each(newHeaders, function(i, header) {
-            thead.find('th:first').before(jQuery('<th>' + escapeHtml(header) + '</th>'));
+            thead.find('th:first').before(jQuery('<th data-full-header="' + escapeHtml(fullHeaders[i]) + '" class="table-header">' + escapeHtml(header) + '</th>'));
         });
         
-        // Update/truncate data rows
-        table.find('tbody tr').each(function() {
+        // Update/rebuild data rows to match new column structure
+        table.find('tbody tr').each(function(rowIdx) {
             var tr = jQuery(this);
             var cells = tr.find('td.cell-editable');
+            var oldCells = cells.clone(true); // Keep old data temporarily
+            var oldData = [];
+            oldCells.each(function() {
+                oldData.push(jQuery(this).text());
+            });
             
-            // Remove extra cells
-            while (cells.length > newHeaders.length) {
-                cells.last().remove();
-                cells = tr.find('td.cell-editable');
-            }
+            // Remove all editable cells
+            cells.remove();
             
-            // Add missing cells
-            while (cells.length < newHeaders.length) {
-                var newCell = jQuery('<td class="cell-editable" data-col="' + cells.length + '"></td>');
+            // Rebuild cells in new order
+            var actionCell = tr.find('td:last'); // Keep action cell at end
+            jQuery.each(fullHeaders, function(colIdx, fullHeader) {
+                var oldIdx = oldHeaders.indexOf(fullHeader);
+                var cellValue = (oldIdx >= 0 && oldIdx < oldData.length) ? oldData[oldIdx] : '';
+                var newCell = jQuery('<td class="cell-editable" data-col="' + colIdx + '"></td>');
+                newCell.text(cellValue);
                 newCell.on('click', function() {
                     if (config.canEdit) editCell(jQuery(this));
                 });
-                tr.find('td:nth-child(' + (cells.length + 1) + ')').before(newCell);
-                cells = tr.find('td.cell-editable');
-            }
+                actionCell.before(newCell);
+            });
         });
         
         syncTableToText(editor);

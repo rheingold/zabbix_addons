@@ -53,13 +53,16 @@
 
 /* Apply theme to page and editor */
 body {
-    /* Let Zabbix CSS control body background */
+    background: inherit;
+    color: inherit;
 }
 
 #macro-list-editor {
-    /* Inherit background from parent Zabbix theme */
+    /* Inherit colors from Zabbix theme */
     color: var(--mle-text-primary);
     padding: 24px;
+    background: inherit;
+    min-height: 100vh;
 }
 
 .macro-list-wrapper {
@@ -121,22 +124,92 @@ body {
     box-shadow: 0 0 0 3px rgba(2, 117, 216, 0.1);
 }
 
+.selection-panels-container {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+}
+
 .selection-panel {
+    flex: 1;
+    min-width: 280px;
     background: var(--mle-bg-primary);
     border: 1px solid var(--mle-border);
     border-radius: 8px;
-    padding: 24px;
-    margin-bottom: 24px;
+    padding: 16px;
     color: var(--mle-text-primary);
     box-shadow: var(--mle-shadow);
+    transition: all 0.2s ease;
 }
 
-.selection-panel h3 {
-    margin-top: 0;
-    margin-bottom: 16px;
+.selection-panel:hover {
+    box-shadow: var(--mle-shadow-hover);
+    transform: translateY(-1px);
+}
+
+.panel-label {
+    display: block;
+    margin: 0 0 12px 0;
     color: var(--mle-text-primary);
-    font-size: 18px;
+    font-size: 13px;
     font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    opacity: 0.8;
+}
+
+.selection-content {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.selection-display {
+    flex: 1;
+    padding: 10px 12px;
+    background: var(--mle-bg-secondary);
+    border: 1px solid var(--mle-border);
+    border-radius: 6px;
+    font-weight: 500;
+    font-size: 13px;
+    color: var(--mle-text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.btn-search {
+    padding: 10px 14px;
+    min-width: 44px;
+    flex-shrink: 0;
+}
+
+#macro-selector {
+    flex: 1;
+    padding: 10px 12px;
+    border: 1px solid var(--mle-border);
+    border-radius: 6px;
+    background: var(--mle-bg-secondary);
+    color: var(--mle-text-primary);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+#macro-selector:hover {
+    border-color: var(--mle-accent);
+    background: var(--mle-bg-primary);
+}
+
+#macro-selector:focus {
+    outline: none;
+    border-color: var(--mle-accent);
+    box-shadow: 0 0 0 3px rgba(2, 117, 216, 0.1);
+}
+
+.macro-editor-section {
+    margin-top: 24px;
 }
 
 .host-search-dialog {
