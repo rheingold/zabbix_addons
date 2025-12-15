@@ -135,12 +135,23 @@ body {
 }
 
 .btn-search {
-    padding: 10px 16px;
-    min-width: 56px;
+    padding: 0 12px;
+    min-height: 32px;
+    min-width: 48px;
     flex-shrink: 0;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
+    border: 1px solid #acb5c2;
+    border-radius: 2px;
+    background: transparent;
+    color: #768d99;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.btn-search:hover {
+    border-color: #768d99;
 }
 
 #macro-selector {
@@ -392,18 +403,19 @@ body {
 .btn-init-pipe,
 .btn-init-json,
 .btn-col-edit {
-    padding: 6px 12px;
-    background: var(--mle-accent);
-    color: white;
-    border: none;
-    border-radius: 3px;
+    padding: 0 10px;
+    min-height: 24px;
+    border: 1px solid #acb5c2;
+    border-radius: 2px;
     cursor: pointer;
     font-size: 13px;
-    transition: background 0.15s ease, transform 0.1s ease;
-    display: flex;
+    transition: all 0.15s ease;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
+    gap: 4px;
+    background: transparent;
+    color: #768d99;
 }
 
 .btn-row-add,
@@ -421,19 +433,20 @@ body {
 .btn-init-pipe:hover,
 .btn-init-json:hover,
 .btn-col-edit:hover {
-    background: var(--mle-accent-hover);
-    transform: translateY(-2px);
+    border-color: #768d99;
 }
 
 .btn-row-remove {
-    padding: 4px 8px;
-    background: var(--mle-danger);
+    padding: 0 8px;
     font-size: 12px;
     margin-left: 8px;
+    color: #d9534f;
+    border: 1px solid #d9534f;
 }
 
 .btn-row-remove:hover {
-    background: #c0392b;
+    border-color: #c9302c;
+    background: rgba(217, 83, 79, 0.1);
 }
 
 .btn-link {
@@ -648,35 +661,35 @@ body {
 
 .btn-primary,
 .btn-secondary {
-    padding: 10px 20px;
-    border: none;
-    border-radius: 6px;
+    padding: 0 10px;
+    min-height: 24px;
+    border: 1px solid #acb5c2;
+    border-radius: 2px;
     cursor: pointer;
-    font-size: 14px;
-    font-weight: 500;
+    font-size: 13px;
     transition: all 0.15s ease;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
+    gap: 4px;
+    background: transparent;
+    color: #768d99;
 }
 
 .btn-primary {
-    background: var(--mle-accent);
-    color: white;
-    box-shadow: 0 2px 4px rgba(2, 117, 216, 0.15);
+    font-weight: 500;
 }
 
 .btn-primary:hover {
-    background: var(--mle-accent-hover);
-    box-shadow: 0 4px 8px rgba(2, 117, 216, 0.25);
-    transform: translateY(-1px);
+    border-color: #768d99;
 }
 
 .btn-secondary {
-    background: #f0f0f0;
-    color: #333;
-    border: 1px solid #ccc;
+    margin-right: 8px;
+}
+
+.btn-secondary:hover {
+    border-color: #768d99;
 }
 
 .btn-secondary:hover {
