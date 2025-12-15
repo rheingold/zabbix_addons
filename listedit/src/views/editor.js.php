@@ -226,9 +226,15 @@ var MacroListEditor = (function() {
         }));
         
         jQuery.each(macros, function(i, macro) {
+            var originText = '';
+            if (macro.origin === 'host') {
+                originText = ' (host)';
+            } else if (macro.origin === 'template') {
+                originText = macro.origin_name ? (' (template: ' + macro.origin_name + ')') : ' (template)';
+            }
             select.append(jQuery('<option>', {
                 value: macro.hostmacroid,
-                text: macro.macro,
+                text: macro.macro + originText,
                 'data-macro-name': macro.macro
             }));
         });
@@ -261,7 +267,8 @@ var MacroListEditor = (function() {
         var container = jQuery('#macro-editor-container');
         container.empty();
         
-        var value = macro.value || '';
+        // Use value if non-empty, otherwise try description (for template defaults)
+        var value = macro.value || macro.description || '';
         var format = detectFormat(value);
         
         var html = '<div class="macro-editor" data-macroid="' + macro.hostmacroid + '" data-format="' + format + '">';
@@ -269,7 +276,8 @@ var MacroListEditor = (function() {
         html += '<div style="display: flex; justify-content: space-between; align-items: flex-start;">';
         html += '<div>';
         html += '<h4 style="margin: 0 0 5px 0;">' + escapeHtml(macro.macro) + '</h4>';
-        if (macro.description) {
+        if (macro.description && macro.value) {
+            // Only show description if we're using value (not description as fallback)
             html += '<p style="margin: 0; font-size: 12px; opacity: 0.7;">' + escapeHtml(macro.description) + '</p>';
         }
         html += '</div>';
@@ -301,7 +309,8 @@ var MacroListEditor = (function() {
      * Render macro table editor
      */
     function renderMacroTableEditor(macro, format) {
-        var value = macro.value || '';
+        // Use value if non-empty, otherwise try description (for template defaults)
+        var value = macro.value || macro.description || '';
         var html = '<div class="macro-table-editor" style="margin-top: 15px;">';
         
         if (format === 'pipe-separated') {
@@ -372,8 +381,10 @@ var MacroListEditor = (function() {
     function renderJsonTableEditor(value, macroId) {
         var items = [];
         try {
-            items = JSON.parse(value);
+            var unescaped = unescapeZabbixJson(value);
+            items = JSON.parse(unescaped);
         } catch(e) {
+            console.error('Failed to parse JSON:', value, e);
             items = [];
         }
         
@@ -856,7 +867,8 @@ var MacroListEditor = (function() {
                     });
                 }
             } else if (format === 'json-array') {
-                var items = JSON.parse(value);
+                var unescaped = unescapeZabbixJson(value);
+                var items = JSON.parse(unescaped);
                 var tbody = table.find('tbody');
                 tbody.empty();
                 
@@ -999,6 +1011,22 @@ var MacroListEditor = (function() {
     }
     
     /**
+     * Unescape JSON string from Zabbix (handles \" -> ")
+     */
+    function unescapeZabbixJson(value) {
+        if (!value) return value;
+        // If string contains escaped quotes like [\"C:\", \"D:\"], unescape them
+        if (value.includes('\\"')) {
+            return value.replace(/\\"/g, '"');
+        }
+        // Check for HTML-encoded quotes
+        if (value.includes('&quot;')) {
+            return value.replace(/&quot;/g, '"');
+        }
+        return value;
+    }
+
+    /**
      * Detect macro value format
      */
     function detectFormat(value) {
@@ -1008,7 +1036,8 @@ var MacroListEditor = (function() {
         
         if (value.trim().startsWith('[') && value.trim().endsWith(']')) {
             try {
-                JSON.parse(value);
+                var unescaped = unescapeZabbixJson(value);
+                JSON.parse(unescaped);
                 return 'json-array';
             } catch(e) {}
         }
