@@ -58,6 +58,7 @@ var MacroListEditor = (function() {
         jQuery('#open-host-search').on('click', openHostSearchDialog);
         jQuery('#host-search-confirm').on('click', confirmHostSearch);
         jQuery('#close-host-search').on('click', closeHostSearchDialog);
+        jQuery('#host-search-cancel').on('click', closeHostSearchDialog);
         jQuery('#host-search-overlay').on('click', closeHostSearchDialog);
         
         // Setup macro selector
@@ -101,8 +102,12 @@ var MacroListEditor = (function() {
                 showError('Failed to load hosts/templates: ' + error);
             }
         });
+        
+        // Restore previous selection
+        if (currentValue) {
+            select.val(currentValue);
+        }
     }
-    
     /**
      * Open host/template search dialog
      */
@@ -150,8 +155,12 @@ var MacroListEditor = (function() {
                 });
             results.append(elem);
         });
+        
+        // Restore previous selection
+        if (currentValue) {
+            select.val(currentValue);
+        }
     }
-    
     /**
      * Search host/template by input
      */
@@ -212,13 +221,17 @@ var MacroListEditor = (function() {
                 showError('Failed to load macros: ' + error);
             }
         });
+        
+        // Restore previous selection
+        if (currentValue) {
+            select.val(currentValue);
+        }
     }
-    
     /**
      * Populate macro selector dropdown
      */
     function populateMacroSelector(macros) {
-        var select = jQuery('#macro-selector');
+        var select = jQuery('#macro-selector'); var currentValue = select.val();  // Save current selection
         select.empty();
         select.append(jQuery('<option>', {
             value: '',
@@ -233,13 +246,17 @@ var MacroListEditor = (function() {
                 originText = macro.origin_name ? (' (template: ' + macro.origin_name + ')') : ' (template)';
             }
             select.append(jQuery('<option>', {
-                value: macro.hostmacroid,
+                value: String(macro.hostmacroid),
                 text: macro.macro + originText,
                 'data-macro-name': macro.macro
             }));
         });
+        
+        // Restore previous selection
+        if (currentValue) {
+            select.val(currentValue);
+        }
     }
-    
     /**
      * Select and edit a specific macro
      */
@@ -251,12 +268,21 @@ var MacroListEditor = (function() {
             return;
         }
         
-        var macro = state.allMacros.find(function(m) { return m.hostmacroid === macroId; });
-        if (!macro) return;
+        var macro = state.allMacros.find(function(m) { return m.hostmacroid == macroId; });
+        if (!macro) {
+            console.log('Macro not found for ID:', macroId);
+            return;
+        }
         
         state.currentMacroId = macroId;
         state.currentMacroName = macro.macro;
         
+        // Debug: Log what we're setting
+        console.log('Setting dropdown value to:', String(macroId));
+        console.log('Dropdown element value before:', jQuery('#macro-selector').val());
+        jQuery('#macro-selector').val(String(macroId));
+        console.log('Dropdown element value after:', jQuery('#macro-selector').val());
+        console.log('Dropdown selected option text:', jQuery('#macro-selector option:selected').text());
         displayMacroEditor(macro);
     }
     
@@ -518,8 +544,12 @@ var MacroListEditor = (function() {
         editor.find('.bulk-editor-textarea').on('change', function() {
             syncTextToTable(jQuery(this), editor);
         });
+        
+        // Restore previous selection
+        if (currentValue) {
+            select.val(currentValue);
+        }
     }
-    
     /**
      * Edit cell inline
      */
@@ -551,8 +581,12 @@ var MacroListEditor = (function() {
                 cancelEdit();
             }
         });
+        
+        // Restore previous selection
+        if (currentValue) {
+            select.val(currentValue);
+        }
     }
-    
     /**
      * Add table row
      */
@@ -952,8 +986,12 @@ var MacroListEditor = (function() {
                 showError('Failed to save macro: ' + error);
             }
         });
+        
+        // Restore previous selection
+        if (currentValue) {
+            select.val(currentValue);
+        }
     }
-    
     /**
      * Initialize empty macro
      */
@@ -979,8 +1017,12 @@ var MacroListEditor = (function() {
                 showError('Failed to initialize macro: ' + error);
             }
         });
+        
+        // Restore previous selection
+        if (currentValue) {
+            select.val(currentValue);
+        }
     }
-    
     /**
      * Parse pipe-separated format
      */
@@ -1096,3 +1138,11 @@ jQuery(document).ready(function($) {
     MacroListEditor.loadHostList();
 });
 </script>
+
+
+
+
+
+
+
+

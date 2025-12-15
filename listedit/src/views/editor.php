@@ -37,7 +37,7 @@ $this->addCssFile('modules/listedit/assets/css/listedit.css');
             <label class="panel-label">1. Select Host or Template</label>
             <div class="selection-content">
                 <div id="current-host-display" class="selection-display">Not selected</div>
-                <button type="button" id="open-host-search" class="btn-primary btn-search">🔍</button>
+                <button type="button" id="open-host-search" class="btn-primary btn-search"><?php echo _('Select'); ?></button>
             </div>
         </div>
         
@@ -71,7 +71,7 @@ $this->addCssFile('modules/listedit/assets/css/listedit.css');
         <div id="host-search-results" class="search-results"></div>
     </div>
     <div class="dialog-footer">
-        <button type="button" class="btn-secondary" id="close-host-search">Cancel</button>
+        <button type="button" class="btn-secondary" id="host-search-cancel">Cancel</button>
         <button type="button" class="btn-primary" id="host-search-confirm">Confirm</button>
     </div>
 </div>

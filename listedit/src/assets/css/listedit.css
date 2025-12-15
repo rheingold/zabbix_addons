@@ -124,14 +124,19 @@ body {
 }
 
 .selection-display {
-    flex: 0 1 140px;
-    padding: 10px 12px;
+    flex: 1;
+    padding: 3px 12px;
     border-radius: 6px;
     font-weight: 500;
     font-size: 13px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    border: 1px solid #ddd;
+    background: rgba(255, 255, 255, 0.3);
+    height: 22px;
+    display: flex;
+    align-items: center;
 }
 
 .btn-search {
@@ -156,11 +161,12 @@ body {
 
 #macro-selector {
     flex: 1 1 300px;
-    padding: 10px 12px;
+    padding: 6px 12px;
     border-radius: 6px;
     font-size: 13px;
     cursor: pointer;
     transition: all 0.15s ease;
+    height: 32px;
 }
 
 #macro-selector:hover {
