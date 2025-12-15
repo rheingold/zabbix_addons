@@ -33,7 +33,7 @@ $this->addCssFile('modules/listedit/assets/css/listedit.css');
     <!-- Selection Panels Container - Side by Side -->
     <div class="selection-panels-container">
         <!-- Host/Template Selection Panel -->
-        <div class="selection-panel selection-panel-host list-table">
+        <div class="selection-panel selection-panel-host list-table ui-widget-content">
             <label class="panel-label">1. Select Host or Template</label>
             <div class="selection-content">
                 <div id="current-host-display" class="selection-display">Not selected</div>
@@ -42,7 +42,7 @@ $this->addCssFile('modules/listedit/assets/css/listedit.css');
         </div>
         
         <!-- Macro Selector Panel -->
-        <div class="selection-panel selection-panel-macro list-table">
+        <div class="selection-panel selection-panel-macro list-table ui-widget-content">
             <label class="panel-label">2. Select Macro to Edit</label>
             <div class="selection-content">
                 <select id="macro-selector" class="macro-selector">
@@ -59,7 +59,7 @@ $this->addCssFile('modules/listedit/assets/css/listedit.css');
 
 <!-- Host/Template Search Dialog -->
 <div id="host-search-overlay" class="host-search-overlay"></div>
-<div id="host-search-dialog" class="host-search-dialog ui-widget-content">
+<div id="host-search-dialog" class="host-search-dialog overlay-dialogue dialogue-body">
     <div class="dialog-header">
         <h3>Search & Select Host or Template</h3>
         <button type="button" id="close-host-search" class="dialog-close">✕</button>
