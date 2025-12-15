@@ -1,7 +1,7 @@
 === AI CONTEXT - LISTEDIT WIDGET (PUBLIC) ===
 
-Version: 0.1.0
-Updated: 2025-12-07
+Version: 0.2.0
+Updated: 2025-12-15
 Repository: https://github.com/rheingold/zabbix_addons (branch: terminal.integrated.shellIntegration.enabled)
 Lead: lukas@plachy.eu | Dev: Claude Sonnet 4 (Anthropic) | License: MIT
 
@@ -25,8 +25,8 @@ This file = generic context (Git-tracked). ai_priv.txt = local paths/credentials
 =============================================================================
 
 Project: Zabbix ListEdit Module
-Version: 0.1.0
-Last Updated: 2025-12-07
+Version: 0.2.0
+Last Updated: 2025-12-15
 
 PURPOSE:
 
@@ -35,71 +35,139 @@ Supports two formats:
 - Pipe-separated with headers: {#COL1}|{#COL2},val1|val2,val3|val4
 - JSON array (single column): ["val1","val2","val3"]
 
-STATUS: WORKING - Module loads and displays editor interface
+New in v0.2.0:
+- Template macro inheritance (BFS traversal of nested templates)
+- Host macros + template macros merged in selector
+- Origin labels (host vs template: name) in dropdown
+- Escaped JSON parsing for array values
+- Theme-aware backgrounds and Zabbix-compliant styling
+- Improved UI with proper height alignment and working Cancel button
+
+STATUS: PRODUCTION READY - Module fully functional with enhanced features
 
 Lead & Architecture: lukas@plachy.eu
 Development: Claude Sonnet 4 (AI Assistant, Anthropic)
 License: MIT
 
-DEPLOYMENT CRITICAL: Edit `/root/customzabbix/Dockerfile` + rebuild image via docker build
-Container: ix-zabbix-web-zabbix-web-1 (TrueNAS Scale)
-App: zabbix-web (managed via midclt)
+DEPLOYMENT CRITICAL: Uses deploy.ps1 script for automated deployment
+Target Host: 192.168.254.16 (TrueNAS Scale)
+Container: ix-zabbix-web-zabbix-web-1
+Module Path: /usr/share/zabbix/modules/listedit/
+Deployment: PowerShell script handles SCP, Docker permissions, container restart
 
 =============================================================================
 
 2. ACTIVE ISSUES & TODO
 =============================================================================
 
-CURRENT STATUS: v0.1.0 COMPLETE - Module Fully Functional
+CURRENT STATUS: v0.2.0 COMPLETE - Enhanced Features Fully Functional
 
-✅ FULLY IMPLEMENTED (v0.1.0 Release):
+✅ FULLY IMPLEMENTED (v0.2.0 Release):
+[✓] Template macro inheritance with BFS traversal
+[✓] Host + template macros merged in dropdown selector
+[✓] Origin labels showing host vs template source
+[✓] Escaped JSON value parsing (unescapeZabbixJson helper)
+[✓] Cache update after macro save for immediate feedback
+[✓] Theme-aware backgrounds (dialogue-body, ui-widget-content)
+[✓] Zabbix-compliant button styling (gray colors, transparent backgrounds)
+[✓] Full-width host/template display with proper height alignment
+[✓] Localized "Select" button text
+[✓] Macro dropdown displays selected text correctly
+[✓] Debug logging for dropdown selection troubleshooting
+[✓] Fixed Cancel button in host search dialog (duplicate ID resolved)
+[✓] All previous v0.1.0 features maintained
+
+✅ FULLY IMPLEMENTED (v0.1.0 Core):
 [✓] Module action routing via getActions() in Module.php
 [✓] Module loads in Zabbix UI (Monitoring → Macro List Editor)
-[✓] HostList AJAX action - loads hosts/templates dropdown with proper JSON response
+[✓] HostList AJAX action - loads hosts/templates dropdown
 [✓] MacroList AJAX action - loads _LIST} macros from selected host/template
 [✓] MacroUpdate AJAX action - saves updated macro values
-[✓] JavaScript initialization (MacroListEditor fully inlined in editor.js.php to avoid race conditions)
-[✓] Host/Template dropdown - renders as proper HTML select, populates via AJAX
+[✓] JavaScript initialization (MacroListEditor fully inlined)
+[✓] Host/Template dropdown with search dialog
 [✓] Macro list loading and filtering (_LIST} detection)
-[✓] Macro value display with format detection (pipe-separated, JSON array, empty)
 [✓] Pipe-separated format editor (with headers, add/remove rows)
 [✓] JSON array format editor (single column, add/remove items)
-[✓] Save functionality working via AJAX POST to listedit.macroupdate
-[✓] Format conversion utilities (parsePipeSeparated, serializeJsonArray, etc)
+[✓] Save functionality via AJAX
 [✓] Error handling and user feedback
-[✓] Empty macro initialization with default templates
-[✓] CSRF validation disabled for AJAX endpoints
-[✓] Permission checks (USER_TYPE_ZABBIX_USER and above)
 [✓] CSS styling for editor UI
 [✓] Docker deployment process working
-[✓] UI rendering fixed (direct PHP view output instead of CHtmlPage wrappers)
-[✓] JavaScript loading race condition resolved (all code inlined synchronously)
 
 KNOWN ISSUES:
-None - module is fully functional and tested in Zabbix 7.4.3
+None - module is fully functional with enhanced features
 
-ACTIVE NEXT STEPS:
-[ ] Test with various macro formats to confirm robustness
-[ ] Test with permission boundaries (different user types)
-[ ] Add inline toast notifications instead of alert()
-[ ] Performance optimization if dealing with large macro lists
-[ ] Add macro search/filter within the list
-
-POTENTIAL FUTURE ENHANCEMENTS (v0.2.0+):
+POTENTIAL FUTURE ENHANCEMENTS (v0.3.0+):
 [ ] Replace alert() with toast notifications
 [ ] Add loading spinners for AJAX calls
 [ ] Add keyboard shortcuts (Ctrl+Enter to save)
 [ ] Add format conversion UI (switch between pipe-sep and JSON)
-[ ] Add macro search/filter
+[ ] Add macro search/filter within the list
 [ ] Add bulk edit capabilities
 [ ] Add undo/redo functionality
 [ ] Add export/import macros
 [ ] Add validation rules for macro values
+[ ] Remove debug logging from production
 
 =============================================================================
 
 3. LAST RESOLVED
 =============================================================================
+
+v0.2.0 ENHANCEMENTS (Dec 15, 2025):
+
+✅ SOLVED: Macro Dropdown Text Display (Dec 15)
+- Problem: Selected macro text not showing in dropdown after selection
+- Root cause: Type mismatch between option values (numbers) and selected value (strings)
+- Solution: Convert all option values to strings using String(macro.hostmacroid) for consistency
+- Result: Dropdown now displays selected macro name correctly with origin label
+
+✅ SOLVED: UI Height Alignment Issues (Dec 15)
+- Problem: Host/template display too tall, dropdown text cut off with excessive padding
+- Root cause: Inconsistent padding and height values between elements
+- Solution: Set both to height: 32px with padding: 6px, then reduced display to 22px/3px padding
+- Result: Proper visual alignment with all text fully visible
+
+✅ SOLVED: Cancel Button Not Working (Dec 15)
+- Problem: Cancel button in host search dialog didn't close the dialog
+- Root cause: Duplicate ID "close-host-search" on both close (✕) button and Cancel button
+- Solution: Renamed Cancel button to "host-search-cancel" with separate click handler
+- Result: Both close (✕) and Cancel buttons now properly close the dialog
+
+✅ SOLVED: Template Macro Inheritance (Dec 14)
+- Problem: Only showing direct host macros, not inherited template macros
+- Root cause: API::Host()->get(['selectParentTemplates']) only returns first-level parents
+- Solution: Implemented BFS traversal to recursively fetch nested template inheritance chain
+- Result: All inherited macros from nested templates now visible in selector
+
+✅ SOLVED: Macro Origin Labeling (Dec 14)
+- Problem: Users couldn't distinguish between host macros and template macros
+- Root cause: No origin information attached to macro records
+- Solution: Added 'origin' and 'origin_name' fields to each macro in MacroList.php
+- Result: Dropdown shows "(host)" or "(template: TemplateName)" for each macro
+
+✅ SOLVED: Escaped JSON Parsing (Dec 14)
+- Problem: JSON array values like ["C:\", "D:\"] showing as escaped strings [\"C:\", \"D:\"]
+- Root cause: Zabbix stores values in description field with escaped quotes
+- Solution: Added unescapeZabbixJson() helper to convert \" back to "
+- Result: JSON arrays parse correctly and render as editable tables
+
+✅ SOLVED: Stale Cache After Save (Dec 14)
+- Problem: Macro changes visible only after page reload
+- Root cause: state.allMacros not updated after successful save
+- Solution: Update state.allMacros in save callback with fresh data
+- Result: Changes reflect immediately in UI without reload
+
+✅ SOLVED: Theme Background Transparency (Dec 14)
+- Problem: Dialog and panels had transparent backgrounds, hard to read
+- Root cause: No background styling, inherited default transparency
+- Solution: Applied Zabbix CSS classes - dialogue-body (dark) for dialog, ui-widget-content (light) for panels
+- Result: Proper theme-aware backgrounds matching Zabbix UI
+
+✅ SOLVED: Button Styling Mismatch (Dec 14)
+- Problem: Buttons had custom blue colors not matching Zabbix defaults
+- Root cause: Custom CSS with accent colors and shadows
+- Solution: Changed to Zabbix standard - transparent background, gray text (#768d99), gray borders (#acb5c2)
+- Result: Buttons now match Zabbix default UI style
 
 v0.1.0 FULL CYCLE (Dec 2-7, 2025):
 
@@ -178,17 +246,51 @@ CRITICAL IMPLEMENTATION DETAILS:
 5. DEPLOYMENT
 =============================================================================
 
-DEPLOYMENT CYCLE:
+AUTOMATED DEPLOYMENT (v0.2.0+):
 
-Build: cd src && tar -czf ../listedit.tar.gz .
-Copy: scp listedit.tar.gz to remote /tmp/
-Extract: ssh tar -xzf /tmp/listedit.tar.gz -C /root/customzabbix/usr/share/zabbix/modules/listedit/
-Build: docker build -t zabbix-web-custom:latest /root/customzabbix/
-Restart: midclt call app.stop zabbix-web; sleep 3; midclt call app.start zabbix-web
+PowerShell Script: deploy.ps1 (in project root)
 
-Container: ix-zabbix-web-zabbix-web-1
-Module Path: /usr/share/zabbix/modules/listedit/
-Verify: Check Monitoring menu in Zabbix UI or curl /zabbix.php?action=listedit.editor (requires authenticated session)
+Usage:
+  cd C:\Users\plachy\Documents\Dev\Cpp\zabbix\listedit
+  .\deploy.ps1
+
+Process:
+1. Scans src/ directory for all module files
+2. Copies files to 192.168.254.16:/tmp/listedit_deploy via SCP
+3. Executes remote script on TrueNAS host:
+   - Copies files to Docker context: /mnt/docker/docker/zabbix/usr/share/zabbix/modules/listedit/
+   - Enters Docker container: ix-zabbix-web-zabbix-web-1
+   - Copies files to module path: /usr/share/zabbix/modules/listedit/
+   - Sets permissions: chown zabbix:zabbix, chmod 755/644
+   - No container restart needed (Zabbix hot-reloads module files)
+4. Cleans up temp files
+
+Target Environment:
+- Host: 192.168.254.16 (TrueNAS Scale)
+- Container: ix-zabbix-web-zabbix-web-1
+- Module Path: /usr/share/zabbix/modules/listedit/
+- Docker Context: /mnt/docker/docker/zabbix/usr/share/zabbix/modules/listedit/
+
+Verification:
+- Check Administration → Modules (module should show as loaded)
+- Access Monitoring → Macro List Editor
+- Check browser console for errors
+
+MANUAL DOCKER REBUILD (if needed):
+
+Only required when:
+- Dockerfile changes needed
+- Container base image updates
+- System-level dependencies changed
+
+Process:
+1. Edit /root/customzabbix/Dockerfile on 192.168.254.16
+2. Build: docker build -t zabbix-web-custom:latest /root/customzabbix/
+3. Restart: midclt call app.stop zabbix-web; sleep 3; midclt call app.start zabbix-web
+
+LEGACY DEPLOYMENT (pre-v0.2.0, deprecated):
+
+See ai_priv.txt for full manual deployment steps
 
 =============================================================================
 

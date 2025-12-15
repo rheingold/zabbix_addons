@@ -1,29 +1,169 @@
 # Zabbix ListEdit Module - v0.2.0 Changelog
 
-**Release Date:** December 8, 2025  
+**Release Date:** December 15, 2025  
 **Previous Version:** v0.1.0  
-**Status:** Implementation Complete ✓
+**Status:** Production Ready ✓
 
 ---
 
 ## Overview
 
-v0.2.0 represents a comprehensive UI/UX overhaul of the Zabbix ListEdit Module, transforming the basic macro editor into a professional, interactive, theme-aware interface with advanced editing capabilities.
+v0.2.0 represents a comprehensive enhancement of the Zabbix ListEdit Module, adding template macro inheritance, UI/UX polish, theme integration, and numerous usability improvements. This release transforms the basic macro editor into a production-ready, professional interface with advanced features.
 
-### Key Statistics
+### Key Enhancements
 
-| Metric | v0.1.0 | v0.2.0 | Change |
-|--------|--------|--------|--------|
-| **CSS Lines** | 350 | 450 | +28% |
-| **JavaScript Lines** | 582 | 917 | +58% |
-| **HTML Elements** | 12 | 45 | +275% |
-| **Feature Count** | 4 | 10 | +150% |
-| **Dialog Interfaces** | 0 | 2 | +2 |
-| **Animation Effects** | 0 | 3 | +3 |
+- **Template Macro Inheritance:** BFS traversal of nested template hierarchies
+- **Macro Origin Labeling:** Clear identification of host vs template macro sources
+- **Theme Integration:** Zabbix-compliant styling and backgrounds
+- **UI Polish:** Height alignment, proper text display, button fixes
+- **Automated Deployment:** PowerShell script for streamlined updates
 
 ---
 
-## Features Implemented
+## Major Features Added (Dec 14-15, 2025)
+
+### Template Macro Inheritance (BFS Traversal)
+
+**Problem:** Macro selector only showed direct host macros, missing inherited template macros.
+
+**Solution:** Implemented breadth-first search algorithm to recursively fetch macros from nested templates.
+
+- Extended `MacroList.php` with BFS template traversal
+- Recursively follows parent template relationships via `selectParentTemplates`
+- Deduplicates macros by `hostmacroid`
+- Handles multi-level template nesting
+
+**Result:** Complete macro visibility including all inherited macros from template hierarchy.
+
+### Macro Origin Labeling
+
+**Enhancement:** Each macro displays its source with template name.
+
+- Format: `{$MACRO} (host)` or `{$MACRO} (template: TemplateName)`
+- Added `origin` and `origin_name` fields to macro records
+- Implemented in `MacroList.php` during traversal
+
+**Benefit:** Instant identification of macro ownership and inheritance source.
+
+### Escaped JSON Parsing
+
+**Problem:** JSON arrays appearing as escaped strings: `[\"C:\", \"D:\"]`
+
+**Solution:** Created `unescapeZabbixJson()` helper to convert escaped JSON.
+
+- Applied in `renderJsonTableEditor()` and `renderMacroTableEditor()`
+- Properly handles Zabbix description field escaping
+
+**Result:** JSON arrays parse correctly and render as editable tables.
+
+### Cache Update After Save
+
+**Problem:** Changes visible only after page reload.
+
+**Solution:** Update `state.allMacros` in save callback with fresh data.
+
+**Result:** Immediate UI updates without reload.
+
+---
+
+## UI/UX Improvements (Dec 14-15, 2025)
+
+### Theme-Aware Backgrounds
+
+- Dialog: Applied `dialogue-body` class (dark background)
+- Panels: Applied `ui-widget-content` class (light gray)
+- Section headers and table headers: Subtle background shading
+
+**Result:** Professional appearance matching Zabbix native UI.
+
+### Zabbix-Compliant Button Styling
+
+- Transparent backgrounds
+- Gray text (`#768d99`) and borders (`#acb5c2`)
+- Removed custom blue accents and shadows
+- Subtle hover effects
+
+**Result:** Seamless integration with Zabbix interface.
+
+### Full-Width Host Display
+
+- Changed `.selection-display` from `flex: 0 1 140px` to `flex: 1`
+- Better use of horizontal space
+- Improved readability of long names
+
+### Localized Button Text
+
+- Changed search button from emoji 🔍 to `<?php echo _('Select'); ?>`
+- Proper internationalization support
+
+### Macro Dropdown Text Display Fix
+
+**Problem:** Selected macro text not appearing in dropdown.
+
+**Root Cause:** Type mismatch between option values and selected value.
+
+**Solution:** Convert all values to strings using `String(macro.hostmacroid)`.
+
+**Result:** Dropdown properly displays selected macro name with origin label.
+
+### Height Alignment Refinement
+
+**Problem:** Host display too tall, dropdown text cut off.
+
+**Solution:** Standardized heights and padding:
+- `.selection-display`: `height: 22px; padding: 3px 12px;`
+- `#macro-selector`: `height: 32px; padding: 6px 12px;`
+
+**Result:** Proper visual alignment with all text fully visible.
+
+### Cancel Button Fix
+
+**Problem:** Cancel button in host search dialog didn't work (only X button worked).
+
+**Root Cause:** Duplicate ID `close-host-search` on both buttons.
+
+**Solution:** Renamed Cancel to `host-search-cancel` with separate click handler.
+
+**Result:** Both close (✕) and Cancel buttons properly close dialog.
+
+---
+
+## Debug Enhancements
+
+### Dropdown Selection Logging
+
+Added console debug logging for troubleshooting:
+- Macro ID being set
+- Dropdown value before/after
+- Selected option text
+- Option population details
+- Selection restoration tracking
+
+---
+
+## Deployment Improvements
+
+### Automated PowerShell Deployment
+
+**New:** `deploy.ps1` script for one-command deployment.
+
+**Features:**
+- Scans `src/` directory automatically
+- Copies to TrueNAS via SCP
+- Deploys to Docker volume and container
+- Sets proper permissions
+- Hot reload (no restart needed)
+
+**Usage:**
+```powershell
+.\deploy.ps1
+```
+
+**Target:** 192.168.254.16 → `/mnt/docker/docker/zabbix/usr/share/zabbix/modules/listedit/`
+
+---
+
+## Original v0.2.0 Features (Dec 8, 2025)
 
 ### 1. Macro Selector Dropdown
 - **Purpose:** Select which macro to edit (only one at a time)
